@@ -1,175 +1,111 @@
 <template>
-    <!-- Design can be changed later -->
-    <div class="container mt-4">
-        <form class="needs-validation" novalidate method="post"
-            action="http://mercury.swin.edu.au/it000000/formtest.php" onsubmit="validateForm(event)"> 
-            <!-- should be changed to the actual endpoint when ready -->
+    <!-- does not connect to backend yet -->
+  <div class="auth-page">
+    <div class="auth-card">
+      <RouterLink to="/" class="auth-logo">CINE<span>LOG</span></RouterLink>
+      <h1 class="auth-title">Join CineLog</h1>
+      <p class="auth-sub">Create your account to review and watchlist movies</p>
 
-            <h2>Job Application</h2>
+      <form class="auth-form" @submit.prevent="handleRegister">
+        <div class="form-group">
+          <label class="form-label">Display Name</label>
+          <input v-model="form.displayName" type="text" class="form-input" placeholder="This name will be visible to other users" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Username</label>
+          <input v-model="form.username" type="text" class="form-input" placeholder="Username" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input v-model="form.email" type="email" class="form-input" placeholder="yourmail@example.com" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input v-model="form.password" type="password" class="form-input" placeholder="••••••••" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm Password</label>
+          <input v-model="form.confirmPassword" type="password" class="form-input" placeholder="••••••••" required />
+        </div>
 
-            <h5 class="mt-3">Personal Information</h5>
+        <p v-if="error" class="auth-error">{{ error }}</p>
 
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label>First Name:</label>
-                    <input type="text" class="form-control" name="Fname" pattern="[A-Za-z]+" required>
-                    <div class="invalid-feedback">
-                        First name is required and must contain letters only.
-                    </div>
-                </div>
+        <button type="submit" class="btn btn-primary auth-submit" :disabled="loading">
+          {{ loading ? 'Creating account...' : 'Create account' }}
+        </button>
+      </form>
 
-                <div class="col-md-6 mb-3">
-                    <label>Last Name:</label>
-                    <input type="text" class="form-control" name="Lname" pattern="[A-Za-z]+" required>
-                    <div class="invalid-feedback">
-                        Last name is required and must contain letters only.
-                    </div>
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label>Date of Birth:</label>
-                    <input type="date" id="DOB" class="form-control" name="DOB" required>
-                    <div class="invalid-feedback">
-                        Date of birth is required and must be valid.
-                    </div>
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label>Mobile Number:</label>
-                    <input type="text" class="form-control" name="phonenumber" pattern="\d{10}" required>
-                    <div class="invalid-feedback">
-                        Please enter a valid 10-digit mobile number.
-                    </div>
-                </div>
-            </div>
-
-            
-            <h5 class="mt-3">Account Details</h5>
-
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label>Username:</label>
-                    <input type="text" class="form-control" name="username" minlength="3" required>
-                    <div class="invalid-feedback">
-                        Username is required and must be at least 3 characters long.
-                    </div>
-                </div>
-
-                <div class="col-md-6 mb-3">
-                    <label>Email:</label>
-                    <input type="email" class="form-control" name="email" required>
-                    <div class="invalid-feedback">
-                        Please enter a valid email address.
-                    </div>
-                </div>
-
-            </div>
-
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label>Password:</label>
-                    <input type="password" class="form-control" id="password" name="password"
-                        pattern="^(?=.*[^A-Za-z0-9]).{8,}$" required>
-                    <div class="invalid-feedback">
-                        Password is required, must be at least 8 characters long, and contain at least one special
-                        character.
-                    </div>
-                </div>
-
-                <div class="col-md-6 mb-3">
-                    <label>Confirm Password:</label>
-                    <input type="password" id="confirm_password" class="form-control" required>
-                    <div class="invalid-feedback" id="confirmPasswordFeedback">
-                        Invalid.
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6 mb-3"> <!-- may be optional / removed if unnecessary -->
-                <label>Preferred Movie Category:</label>
-                <select class="form-select" name="category" required>
-                    <option value="">Please select</option>
-                    <option>Romance</option>
-                    <option>Action</option>
-                    <option>Comedy</option>
-                    <option>Horror</option>
-                    <option>Science Fiction</option>
-                    <option>Other</option>
-                </select>
-                <div class="invalid-feedback">
-                    Please select a movie category.
-                </div>
-            </div>
-
-            <button type="button" class="btn btn-secondary" onclick="toggleTerms()">
-                Terms and Conditions
-            </button>
-
-            <button type="submit" class="btn btn-primary">Submit</button>
-
-            <div id="termsText" class="mt-3" style="display:none;">
-                <p>Placeholder terms and conditions...</p>
-            </div>
-
-        </form>
+      <p class="auth-footer">
+        Already have an account?
+        <RouterLink to="/login" class="auth-link">Sign in</RouterLink>
+      </p>
     </div>
-    <script>
-        function toggleTerms() {
-    let terms = document.getElementById("termsText");
-
-    if (terms.style.display === "none") {
-        terms.style.display = "block";
-    } else {
-        terms.style.display = "none";
-    }
-}
-
-function validateForm(event) {
-    let form = event.target;
-
-    let password = document.getElementById("password");
-    let confirmPassword = document.getElementById("confirm_password");
-    let dob = document.getElementById("DOB");
-
-    confirmPassword.setCustomValidity("");
-    dob.setCustomValidity("");
-
-    if (confirmPassword.value === "") {
-        confirmPassword.setCustomValidity("Please confirm your password");
-    } else if (password.value !== confirmPassword.value) {
-        confirmPassword.setCustomValidity("Passwords do not match");
-    }
-
-    if (dob.value === "") {
-        dob.setCustomValidity("Please enter your date of birth");
-    } else {
-        let birthDate = new Date(dob.value);
-        let today = new Date();
-
-        if (birthDate > today) {
-            dob.setCustomValidity("Date of birth is invalid");
-        } //else {
-            //let age = today.getFullYear() - birthDate.getFullYear();
-            //let monthDiff = today.getMonth() - birthDate.getMonth();
-            //let dayDiff = today.getDate() - birthDate.getDate();
-
-            //if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
-              //  age--;
-            //}
-
-            //if (age < 18) {
-              //  dob.setCustomValidity("You must be at least 18 years old to apply");
-            //}
-            //to be decided if we want to add an age restriction, 
-            // if so, change the age limit as needed
-        //}
-    }
-
-    if (!form.checkValidity()) {
-        event.preventDefault();
-        event.stopPropagation();
-        form.reportValidity();
-    }
-
-    form.classList.add("was-validated");
-}
-    </script>
+  </div>
 </template>
+
+<script setup>
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
+
+const auth = useAuthStore()
+const router = useRouter()
+
+const form = ref({
+  displayName: '',
+  username: '',
+  email: '',
+  password: '',
+  confirmPassword: ''
+})
+const error = ref('')
+const loading = ref(false)
+
+async function handleRegister() {
+  if (form.value.password !== form.value.confirmPassword) {
+    error.value = 'Passwords do not match'
+    return
+  }
+
+  error.value = ''
+  loading.value = true
+
+  const result = await auth.register(form.value)
+  loading.value = false
+
+  if (result.success) {
+    router.push('/')
+  } else {
+    error.value = result.error
+  }
+}
+</script>
+
+<style scoped>
+.auth-page {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  padding: 40px 24px;
+  background: radial-gradient(ellipse at 50% 0%, rgba(232,197,71,0.06) 0%, transparent 60%), var(--bg);
+}
+.auth-card {
+  width: 100%; max-width: 420px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 40px 36px;
+}
+.auth-logo {
+  font-family: var(--font-display); font-size: 1.4rem; letter-spacing: 0.08em;
+  color: var(--text); display: block; margin-bottom: 28px;
+}
+.auth-logo span { color: var(--accent); }
+.auth-title { font-family: var(--font-display); font-size: 2rem; letter-spacing: 0.04em; margin-bottom: 4px; }
+.auth-sub { font-size: 0.88rem; color: var(--text-muted); margin-bottom: 28px; }
+.auth-form { display: flex; flex-direction: column; gap: 18px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-label { font-size: 0.88rem; font-weight: 500; color: var(--text); }
+.form-input { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font-size: 0.95rem; }
+.form-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.12); }
+.auth-error { font-size: 0.82rem; color: var(--red); background: rgba(232,93,93,0.1); padding: 8px 12px; border-radius: 6px; }
+.auth-submit { width: 100%; justify-content: center; padding: 13px; font-size: 0.95rem; margin-top: 4px; }
+.auth-footer { font-size: 0.85rem; color: var(--text-muted); text-align: center; margin-top: 20px; }
+.auth-link { color: var(--accent); font-weight: 500; }
+</style>
