@@ -1,58 +1,72 @@
 <template>
   <div class="home">
-    <!-- Hero -->
-    <section class="hero">
-      <div class="hero-bg">
-        <img :src="featured.backdrop" :alt="featured.title" />
-        <div class="hero-gradient"></div>
+    <!-- Hero Section -->
+    <section class="hero position-relative d-flex align-items-end" style="min-height: 70vh;">
+      <div class="hero-bg position-absolute inset-0">
+        <img :src="featured.backdrop" :alt="featured.title" class="w-100 h-100 object-fit-cover opacity-25" />
+        <div class="hero-gradient position-absolute inset-0"></div>
       </div>
-      <div class="container hero-content">
-        <div class="hero-meta">
-          <span class="badge badge-type">{{ featured.type === 'tv' ? 'TV Series' : 'Film' }}</span>
-          <span class="hero-year">{{ featured.year }}</span>
-        </div>
-        <h1 class="hero-title">{{ featured.title }}</h1>
-        <p class="hero-synopsis">{{ featured.synopsis }}</p>
-        <div class="hero-rating">
-          <span class="rating-star">★</span>
-          <span class="rating-val">{{ featured.rating }}</span>
-          <span class="rating-sep">/10</span>
-          <span class="rating-count">{{ featured.reviewCount }} reviews</span>
-        </div>
-        <div class="hero-actions">
-          <RouterLink :to="`/media/${featured.id}`" class="btn btn-primary">View Details</RouterLink>
-          <button v-if="auth.isAuthenticated" class="btn btn-ghost" @click="mediaStore.toggleWatchlist(featured.id)">
-            {{ mediaStore.isInWatchlist(featured.id) ? '✓ In Watchlist' : '+ Watchlist' }}
-          </button>
+
+      <div class="container position-relative pb-5">
+        <div class="row">
+          <div class="col-12 col-md-8">
+            <div class="hero-meta d-flex align-items-center gap-2 mb-2">
+              <span class="badge bg-primary">{{ featured.type === 'tv' ? 'TV Series' : 'Film' }}</span>
+              <span class="text-muted small">{{ featured.year }}</span>
+            </div>
+
+            <h1 class="hero-title display-1">{{ featured.title }}</h1>
+            <p class="text-muted">{{ featured.synopsis }}</p>
+
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <span class="text-warning fs-5">★</span>
+              <span class="fw-semibold fs-4 text-warning">{{ featured.rating }}</span>
+              <span class="text-muted">/10</span>
+              <span class="small text-muted ms-1">{{ featured.reviewCount }} reviews</span>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2">
+              <RouterLink :to="`/media/${featured.id}`" class="btn btn-primary">View Details</RouterLink>
+              <button v-if="auth.isAuthenticated" class="btn btn-outline-light"
+                @click="mediaStore.toggleWatchlist(featured.id)">
+                {{ mediaStore.isInWatchlist(featured.id) ? '✓ In Watchlist' : '+ Watchlist' }}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- Trending strip -->
-    <section class="section">
+    <!-- Trending Section -->
+    <section class="section py-5">
       <div class="container">
-        <h2 class="section-title">Trending <span>Now</span></h2>
-        <div class="media-grid">
-          <MediaCard v-for="m in mediaStore.trending" :key="m.id" :media="m" />
+        <h2 class="section-title mb-4">Trending <span>Now</span></h2>
+        <div class="row g-3">
+          <div class="col-6 col-sm-4 col-md-3 col-lg-2" v-for="m in mediaStore.trending" :key="m.id">
+            <MediaCard :media="m" />
+          </div>
         </div>
-        <div style="text-align:center;margin-top:28px;">
-          <RouterLink to="/trending" class="btn btn-ghost">See all trending →</RouterLink>
+        <div class="text-center mt-4">
+          <RouterLink to="/trending" class="btn btn-outline-secondary">See all trending →</RouterLink>
         </div>
       </div>
     </section>
 
-    <!-- Recent reviews feed -->
-    <section class="section">
+    <!-- Latest Reviews Section -->
+    <section class="section py-5">
       <div class="container">
-        <h2 class="section-title">Latest <span>Reviews</span></h2>
-        <div class="reviews-feed">
-          <div v-for="review in recentReviews" :key="review.id" class="feed-item">
-            <ReviewCard :review="review" />
-            <div class="feed-media">
-              <RouterLink :to="`/media/${review.mediaId}`" class="feed-media-link">
-                <img :src="getMedia(review.mediaId)?.poster" :alt="getMedia(review.mediaId)?.title" />
-                <span>{{ getMedia(review.mediaId)?.title }}</span>
-              </RouterLink>
+        <h2 class="section-title mb-4">Latest <span>Reviews</span></h2>
+        <div class="row gy-3">
+          <div v-for="review in recentReviews" :key="review.id" class="col-12">
+            <div class="d-flex flex-wrap flex-md-nowrap align-items-start gap-3">
+              <ReviewCard :review="review" />
+              <div class="text-center" style="width:80px;">
+                <RouterLink :to="`/media/${review.mediaId}`" class="d-flex flex-column gap-1">
+                  <img :src="getMedia(review.mediaId)?.poster" :alt="getMedia(review.mediaId)?.title"
+                    class="img-fluid rounded border" />
+                  <span class="small text-muted">{{ getMedia(review.mediaId)?.title }}</span>
+                </RouterLink>
+              </div>
             </div>
           </div>
         </div>
@@ -71,36 +85,32 @@ import ReviewCard from '../components/ReviewCard.vue'
 const mediaStore = useMediaStore()
 const auth = useAuthStore()
 
-const featured = computed(() => mediaStore.movies[1]) // Oppenheimer as hero
+const featured = computed(() => mediaStore.movies[1]) // Example: featured movie
 const recentReviews = computed(() => [...mediaStore.reviews].slice(0, 4))
 function getMedia(id) { return mediaStore.getMovieById(id) }
 </script>
 
 <style scoped>
-.hero { position: relative; min-height: 70vh; display: flex; align-items: flex-end; overflow: hidden; }
-.hero-bg { position: absolute; inset: 0; }
-.hero-bg img { width: 100%; height: 100%; object-fit: cover; opacity: 0.35; }
-.hero-gradient { position: absolute; inset: 0; background: linear-gradient(to top, var(--bg) 0%, rgba(10,10,15,0.4) 60%, transparent 100%); }
-.hero-content { position: relative; z-index: 1; padding-bottom: 60px; max-width: 640px; }
-.hero-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-.hero-year { font-size: 0.85rem; color: var(--text-muted); }
-.hero-title { font-family: var(--font-display); font-size: clamp(2.8rem, 6vw, 5rem); letter-spacing: 0.04em; line-height: 0.95; margin-bottom: 16px; }
-.hero-synopsis { font-size: 0.95rem; color: var(--text-muted); line-height: 1.7; margin-bottom: 20px; max-width: 520px; }
-.hero-rating { display: flex; align-items: center; gap: 6px; margin-bottom: 24px; }
-.rating-star { color: var(--accent); font-size: 1.1rem; }
-.rating-val { font-size: 1.4rem; font-weight: 600; color: var(--accent); }
-.rating-sep { color: var(--text-dim); }
-.rating-count { font-size: 0.82rem; color: var(--text-muted); margin-left: 4px; }
-.hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
-.section { padding: 60px 0; }
-.media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; }
-.reviews-feed { display: flex; flex-direction: column; gap: 16px; }
-.feed-item { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: start; }
-.feed-media-link { display: flex; flex-direction: column; gap: 6px; width: 80px; }
-.feed-media-link img { width: 80px; height: 120px; object-fit: cover; border-radius: var(--radius); border: 1px solid var(--border); }
-.feed-media-link span { font-size: 0.7rem; color: var(--text-muted); text-align: center; line-height: 1.3; }
-@media (max-width: 600px) {
-  .feed-item { grid-template-columns: 1fr; }
-  .feed-media { display: none; }
+/* Hero background & gradient */
+.hero-bg img {
+  object-fit: cover;
+}
+
+.hero-gradient {
+  background: linear-gradient(to top, var(--bg, #0a0a0f) 0%, rgba(10,10,15,0.4) 60%, transparent 100%);
+}
+
+/* Hero title responsive size */
+.hero-title {
+  font-family: var(--font-display, sans-serif);
+  font-size: clamp(2rem, 6vw, 4rem);
+  line-height: 1.1;
+}
+
+/* Responsive spacing for hero */
+@media (max-width: 768px) {
+  .hero-title {
+    font-size: clamp(1.5rem, 5vw, 2.5rem);
+  }
 }
 </style>
