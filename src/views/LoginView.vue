@@ -1,63 +1,72 @@
 <template>
-  <div class="auth-page d-flex align-items-center justify-content-center min-vh-100 py-5 bg-light">
+  <div class="auth-page d-flex align-items-center justify-content-center min-vh-100 py-5">
     <div class="card p-4 p-md-5" style="max-width: 420px; width:100%;">
       <!-- Logo -->
-      <RouterLink to="/" class="d-block text-center mb-4 fs-3 fw-bold text-dark text-decoration-none">
+      <RouterLink to="/" class="d-block text-center mb-4 fs-3 fw-bold text-light text-decoration-none">
         CINE<span class="text-warning">LOG</span>
       </RouterLink>
 
       <!-- Title & Subtitle -->
-      <h1 class="h4 text-center mb-1">Welcome back</h1>
-      <p class="text-muted text-center mb-4">Sign in to your account</p>
+      <h1 class="h4 text-center mb-1 text-light">Welcome back</h1>
+      <p class="text-light text-center mb-4">
+        Sign in to your account
+      </p>
 
       <!-- Form -->
-      <form @submit.prevent="handleLogin" class="d-flex flex-column gap-3">
-        <div class="mb-3">
-          <label class="form-label">Username or Email</label>
+      <form @submit.prevent="handleLogin" class="row g-3">
+        <!-- Username / Email -->
+        <div class="col-12">
+          <label class="form-label text-light">Username or Email</label>
           <input
             v-model="form.username"
             type="text"
-            class="form-control"
+            class="form-control bg-dark text-light border-secondary"
             placeholder="cinephile_kai"
             required
           />
         </div>
 
-        <div class="mb-3">
-          <label class="form-label">Password</label>
+        <!-- Password -->
+        <div class="col-12">
+          <label class="form-label text-light">Password</label>
           <input
             v-model="form.password"
             type="password"
-            class="form-control"
+            class="form-control bg-dark text-light border-secondary"
             placeholder="••••••••"
             required
           />
         </div>
 
-        <!-- Error message -->
-        <p v-if="error" class="text-danger small bg-danger bg-opacity-10 p-2 rounded">
-          {{ error }}
-        </p>
+        <!-- Error -->
+        <div v-if="error" class="col-12">
+          <p class="text-danger small bg-danger bg-opacity-10 p-2 rounded">
+            {{ error }}
+          </p>
+        </div>
 
-        <button type="submit" class="btn btn-primary w-100" :disabled="loading">
-          {{ loading ? 'Signing in...' : 'Sign in' }}
-        </button>
+        <!-- Submit -->
+        <div class="col-12">
+          <button type="submit" class="btn btn-warning w-100" :disabled="loading">
+            {{ loading ? 'Signing in...' : 'Sign in' }}
+          </button>
+        </div>
       </form>
 
       <!-- Footer -->
-      <p class="text-center text-muted small mt-3">
+      <p class="text-center text-light small mt-3">
         Don't have an account?
         <RouterLink to="/register" class="text-warning fw-medium text-decoration-none">Create one</RouterLink>
       </p>
 
       <!-- Demo accounts -->
-      <div class="mt-4 pt-3 border-top">
-        <p class="text-uppercase small text-muted mb-2">Demo accounts</p>
+      <div class="demo-hint mt-3 pt-3 border-top border-secondary">
+        <p class="small text-light mb-2 text-uppercase">Demo accounts</p>
         <div class="d-flex flex-wrap gap-2">
           <button
             v-for="u in demoUsers"
             :key="u.username"
-            class="btn btn-outline-secondary btn-sm"
+            class="btn btn-outline-warning btn-sm"
             @click="fillDemo(u)"
           >
             {{ u.username }}
@@ -109,19 +118,19 @@ async function handleLogin() {
 .auth-page {
   background: radial-gradient(
       ellipse at 50% 0%,
-      rgba(232, 197, 71, 0.06) 0%,
+      rgba(232, 197, 71, 0.05) 0%,
       transparent 60%
     ),
-    #f8f9fa;
+    var(--bg);
 }
 
 .card {
   border-radius: 0.75rem;
-  border: 1px solid #dee2e6;
-  background-color: #fff;
+  border: 1px solid var(--border);
+  background-color: var(--bg2);
 }
 
 .text-warning {
-  color: #e8c547 !important;
+  color: var(--accent) !important;
 }
 </style>

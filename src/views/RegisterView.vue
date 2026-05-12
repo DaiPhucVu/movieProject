@@ -1,43 +1,98 @@
 <template>
-    <!-- does not connect to backend yet -->
-  <div class="auth-page">
-    <div class="auth-card">
-      <RouterLink to="/" class="auth-logo">CINE<span>LOG</span></RouterLink>
-      <h1 class="auth-title">Join CineLog</h1>
-      <p class="auth-sub">Create your account to review and watchlist movies</p>
+  <div class="auth-page d-flex align-items-center justify-content-center min-vh-100 py-5">
+    <div class="card p-4 p-md-5" style="max-width: 420px; width:100%;">
+      <!-- Logo -->
+      <RouterLink to="/" class="d-block text-center mb-4 fs-3 fw-bold text-light text-decoration-none">
+        CINE<span class="text-warning">LOG</span>
+      </RouterLink>
 
-      <form class="auth-form" @submit.prevent="handleRegister">
-        <div class="form-group">
-          <label class="form-label">Display Name</label>
-          <input v-model="form.displayName" type="text" class="form-input" placeholder="This name will be visible to other users" required />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Username</label>
-          <input v-model="form.username" type="text" class="form-input" placeholder="Username" required />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Email</label>
-          <input v-model="form.email" type="email" class="form-input" placeholder="yourmail@example.com" required />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Password</label>
-          <input v-model="form.password" type="password" class="form-input" placeholder="••••••••" required />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Confirm Password</label>
-          <input v-model="form.confirmPassword" type="password" class="form-input" placeholder="••••••••" required />
+      <!-- Title & Subtitle -->
+      <h1 class="h4 text-center mb-1 text-light">Join CineLog</h1>
+      <p class="text-light text-center mb-4">
+        Create your account to review and watchlist movies
+      </p>
+
+      <!-- Form -->
+      <form @submit.prevent="handleRegister" class="row g-3">
+        <!-- Display Name -->
+        <div class="col-12">
+          <label class="form-label text-light">Display Name</label>
+          <input
+            v-model="form.displayName"
+            type="text"
+            class="form-control bg-dark text-light border-secondary"
+            placeholder="This name will be visible to other users"
+            required
+          />
         </div>
 
-        <p v-if="error" class="auth-error">{{ error }}</p>
+        <!-- Username -->
+        <div class="col-12">
+          <label class="form-label text-light">Username</label>
+          <input
+            v-model="form.username"
+            type="text"
+            class="form-control bg-dark text-light border-secondary"
+            placeholder="Username"
+            required
+          />
+        </div>
 
-        <button type="submit" class="btn btn-primary auth-submit" :disabled="loading">
-          {{ loading ? 'Creating account...' : 'Create account' }}
-        </button>
+        <!-- Email -->
+        <div class="col-12">
+          <label class="form-label text-light">Email</label>
+          <input
+            v-model="form.email"
+            type="email"
+            class="form-control bg-dark text-light border-secondary"
+            placeholder="yourmail@example.com"
+            required
+          />
+        </div>
+
+        <!-- Password -->
+        <div class="col-12">
+          <label class="form-label text-light">Password</label>
+          <input
+            v-model="form.password"
+            type="password"
+            class="form-control bg-dark text-light border-secondary"
+            placeholder="••••••••"
+            required
+          />
+        </div>
+
+        <!-- Confirm Password -->
+        <div class="col-12">
+          <label class="form-label text-light">Confirm Password</label>
+          <input
+            v-model="form.confirmPassword"
+            type="password"
+            class="form-control bg-dark text-light border-secondary"
+            placeholder="••••••••"
+            required
+          />
+        </div>
+
+        <!-- Error -->
+        <div v-if="error" class="col-12">
+          <p class="text-danger small bg-danger bg-opacity-10 p-2 rounded">
+            {{ error }}
+          </p>
+        </div>
+
+        <!-- Submit -->
+        <div class="col-12">
+          <button type="submit" class="btn btn-warning w-100" :disabled="loading">
+            {{ loading ? 'Creating account...' : 'Create account' }}
+          </button>
+        </div>
       </form>
 
-      <p class="auth-footer">
+      <!-- Footer -->
+      <p class="text-center text-light small mt-3">
         Already have an account?
-        <RouterLink to="/login" class="auth-link">Sign in</RouterLink>
+        <RouterLink to="/login" class="text-warning fw-medium text-decoration-none">Sign in</RouterLink>
       </p>
     </div>
   </div>
@@ -83,29 +138,21 @@ async function handleRegister() {
 
 <style scoped>
 .auth-page {
-  min-height: 100vh; display: flex; align-items: center; justify-content: center;
-  padding: 40px 24px;
-  background: radial-gradient(ellipse at 50% 0%, rgba(232,197,71,0.06) 0%, transparent 60%), var(--bg);
+  background: radial-gradient(
+      ellipse at 50% 0%,
+      rgba(232, 197, 71, 0.05) 0%,
+      transparent 60%
+    ),
+    var(--bg); /* should be dark from global CSS */
 }
-.auth-card {
-  width: 100%; max-width: 420px;
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: var(--radius-lg); padding: 40px 36px;
+
+.card {
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background-color: var(--bg2);
 }
-.auth-logo {
-  font-family: var(--font-display); font-size: 1.4rem; letter-spacing: 0.08em;
-  color: var(--text); display: block; margin-bottom: 28px;
+
+.text-warning {
+  color: var(--accent) !important;
 }
-.auth-logo span { color: var(--accent); }
-.auth-title { font-family: var(--font-display); font-size: 2rem; letter-spacing: 0.04em; margin-bottom: 4px; }
-.auth-sub { font-size: 0.88rem; color: var(--text-muted); margin-bottom: 28px; }
-.auth-form { display: flex; flex-direction: column; gap: 18px; }
-.form-group { display: flex; flex-direction: column; gap: 6px; }
-.form-label { font-size: 0.88rem; font-weight: 500; color: var(--text); }
-.form-input { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font-size: 0.95rem; }
-.form-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.12); }
-.auth-error { font-size: 0.82rem; color: var(--red); background: rgba(232,93,93,0.1); padding: 8px 12px; border-radius: 6px; }
-.auth-submit { width: 100%; justify-content: center; padding: 13px; font-size: 0.95rem; margin-top: 4px; }
-.auth-footer { font-size: 0.85rem; color: var(--text-muted); text-align: center; margin-top: 20px; }
-.auth-link { color: var(--accent); font-weight: 500; }
 </style>
