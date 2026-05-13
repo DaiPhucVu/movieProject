@@ -1,4 +1,8 @@
 <template>
+  <!-- the colors are a bit inconsistent, i'm not really happy with that, 
+   but i have officially lost in my code, couldnt find where it is to fix it, 
+   maybe i'm blind.-->
+
   <div class="trending-page">
     <!-- Hero Section -->
     <section class="trending-hero py-5 position-relative text-light">
@@ -21,15 +25,13 @@
         <div class="d-flex justify-content-end gap-3 sort-panel mx-auto p-3 rounded">
           <span class="sort-label text-light fw-semibold">Sort by</span>
           <div class="sort-select position-relative">
-            <select v-model="sortBy" class="form-select bg-dark text-light border-secondary">
+            <select v-model="sortBy" class="form-select sort-dropdown text-light border-secondary">
               <option value="rating">IMDb rating</option>
               <option value="reviewCount">Review count</option>
             </select>
-            <span class="select-arrow text-muted">▾</span>
+            <span class="select-arrow">▾</span>
           </div>
-          <button type="button" class="sort-toggle btn btn-sm btn-outline-light" 
-            @click="toggleSortOrder" 
-            :title="sortOrder === 'desc' ? 'Sort ascending' : 'Sort descending'">
+          <button type="button" class="sort-toggle" @click="toggleSortOrder" :title="sortOrder === 'desc' ? 'Sort ascending' : 'Sort descending'">
             <span class="direction-arrow">{{ sortOrder === 'desc' ? '⇩' : '⇧' }}</span>
           </button>
         </div>
@@ -118,20 +120,70 @@ function toggleSortOrder() {
 
 /* Sort Panel */
 .sort-panel {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.15);
-  backdrop-filter: blur(8px);
-  border-radius: 12px;
+  background: rgba(18, 18, 26, 0.95);
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 18px 45px rgba(0,0,0,0.28);
+  backdrop-filter: blur(12px);
+  border-radius: 18px;
 }
-.sort-select select {
+.sort-label {
+  display: flex;
+  align-items: center;
+  color: #f8f9fa;
+}
+.sort-select {
+  min-width: 220px;
+}
+.sort-dropdown {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  width: 100%;
   background: #12121a;
   border: 1px solid #2c2c38;
   color: #f5f5f5;
-  border-radius: 8px;
-  padding: 6px 30px 6px 10px;
+  border-radius: 12px;
+  padding: 10px 36px 10px 14px;
+}
+.sort-dropdown:focus {
+  outline: none;
+  border-color: #6e52f7;
+  box-shadow: 0 0 0 3px rgba(110, 82, 247, 0.16);
+}
+.select-arrow {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  color: #a8a8b3;
+  pointer-events: none;
+  font-size: 0.95rem;
+}
+.sort-toggle {
+  width: 46px;
+  height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: #f8f9fa;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+.sort-toggle:hover {
+  background: rgba(255,255,255,0.12);
+}
+.direction-arrow {
+  font-size: 1rem;
+  line-height: 1;
 }
 
 /* Ranked Cards (Original Vertical Layout) */
+.ranked-section {
+  background: #282b3b;
+  padding: 60px 0;
+}
 .ranked-list {
   display: flex;
   flex-direction: column;
