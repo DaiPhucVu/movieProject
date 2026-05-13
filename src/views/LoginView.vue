@@ -59,20 +59,6 @@
         <RouterLink to="/register" class="text-warning fw-medium text-decoration-none">Create one</RouterLink>
       </p>
 
-      <!-- Demo accounts -->
-      <div class="demo-hint mt-3 pt-3 border-top border-secondary">
-        <p class="small text-light mb-2 text-uppercase">Demo accounts</p>
-        <div class="d-flex flex-wrap gap-2">
-          <button
-            v-for="u in demoUsers"
-            :key="u.username"
-            class="btn btn-outline-warning btn-sm"
-            @click="fillDemo(u)"
-          >
-            {{ u.username }}
-          </button>
-        </div>
-      </div>
     </div>
   </div>
 </template>
