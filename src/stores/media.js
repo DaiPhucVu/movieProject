@@ -1,9 +1,9 @@
-// Manages movies (still from mockData), reviews, watchlist and media likes.
-// Reviews, watchlist and likes now talk to the real backend API.
-// Movies stay in mockData because we have no TMDB/movie API set up yet.
+// Manages movies, reviews, watchlist, and backend data.
+// Movies still start from mockData so the app works before the backend is loaded.
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useAuthStore } from '../stores/auth'
 import { mockMovies } from '../data/mockData'
 
 const API = 'http://localhost:3000/api'
@@ -11,17 +11,38 @@ const API = 'http://localhost:3000/api'
 export const useMediaStore = defineStore('media', () => {
 
   // ── State
-  const movies    = ref([...mockMovies])   // still from mockData
-  const reviews   = ref([])               // loaded from backend
-  const watchlist = ref([])               // array of media_id numbers
-  const likedMedia = ref([])              // array of media_id numbers
+  const auth = useAuthStore()
 
+  const movies    = ref([...mockMovies])
+  const reviews   = ref([])
+  const watchlist = ref([])
+  const likedMedia = ref([])
   // ── Computed 
   const trending = computed(() =>
     [...movies.value].sort((a, b) => b.rating - a.rating).slice(0, 6)
   )
 
-  // ── Movie helpers (still local — no backend needed)
+  function authHeaders() {
+    return auth.token ? { Authorization: `Bearer ${auth.token}` } : {}
+  }
+
+  // ── Backend media
+  async function fetchMedia() {
+    try {
+      const res = await fetch(`${API}/media`)
+      const data = await res.json()
+      if (res.ok && data.media) {
+        movies.value = data.media
+        return { success: true }
+      }
+      return { success: false, error: data.error || 'Could not load movies' }
+    } catch (err) {
+      console.error('fetchMedia error:', err)
+      return { success: false, error: 'Cannot connect to server.' }
+    }
+  }
+
+  // ── Movie helpers 
   function getMovieById(id) {
     return movies.value.find(m => m.id === Number(id))
   }
@@ -44,11 +65,12 @@ export const useMediaStore = defineStore('media', () => {
     try {
       const res  = await fetch(`${API}/reviews?mediaId=${mediaId}`)
       const data = await res.json()
-      // Merge into the reviews array (replace any existing ones for this mediaId)
-      reviews.value = [
-        ...reviews.value.filter(r => r.mediaId !== Number(mediaId)),
-        ...data.reviews,
-      ]
+      if (res.ok) {
+        reviews.value = [
+          ...reviews.value.filter(r => r.mediaId !== Number(mediaId)),
+          ...data.reviews,
+        ]
+      }
     } catch (err) {
       console.error('fetchReviewsByMediaId error:', err)
     }
@@ -59,10 +81,12 @@ export const useMediaStore = defineStore('media', () => {
     try {
       const res  = await fetch(`${API}/reviews?userId=${userId}`)
       const data = await res.json()
-      reviews.value = [
-        ...reviews.value.filter(r => r.userId !== Number(userId)),
-        ...data.reviews,
-      ]
+      if (res.ok) {
+        reviews.value = [
+          ...reviews.value.filter(r => r.userId !== Number(userId)),
+          ...data.reviews,
+        ]
+      }
     } catch (err) {
       console.error('fetchReviewsByUserId error:', err)
     }
@@ -83,7 +107,7 @@ export const useMediaStore = defineStore('media', () => {
     try {
       const res  = await fetch(`${API}/reviews`, {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify(reviewData),
       })
       const data = await res.json()
@@ -107,7 +131,7 @@ export const useMediaStore = defineStore('media', () => {
     try {
       const res  = await fetch(`${API}/reviews/${reviewId}`, {
         method:  'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify(updateData),
       })
       const data = await res.json()
@@ -128,7 +152,7 @@ export const useMediaStore = defineStore('media', () => {
     try {
       const res  = await fetch(`${API}/reviews/${reviewId}`, {
         method:  'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ userId }),
       })
       const data = await res.json()
@@ -155,7 +179,7 @@ export const useMediaStore = defineStore('media', () => {
     try {
       const res  = await fetch(`${API}/reviews/${reviewId}/like`, {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ userId }),
       })
       const data = await res.json()
@@ -176,9 +200,13 @@ export const useMediaStore = defineStore('media', () => {
   // Load the user's watchlist from the backend
   async function fetchWatchlist(userId) {
     try {
-      const res  = await fetch(`${API}/watchlist/${userId}`)
+      const res  = await fetch(`${API}/watchlist/${userId}`, {
+        headers: { ...authHeaders() },
+      })
       const data = await res.json()
-      watchlist.value = data.watchlist   // array of media_id numbers
+      if (res.ok && Array.isArray(data.watchlist)) {
+        watchlist.value = data.watchlist.map(item => item.id)
+      }
     } catch (err) {
       console.error('fetchWatchlist error:', err)
     }
@@ -192,8 +220,8 @@ export const useMediaStore = defineStore('media', () => {
     try {
       const res  = await fetch(`${API}/watchlist/toggle`, {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, mediaId }),
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ mediaId }),
       })
       const data = await res.json()
 
@@ -232,7 +260,7 @@ export const useMediaStore = defineStore('media', () => {
 
   return {
     movies, reviews, watchlist, likedMedia, trending,
-    getMovieById, searchMedia,
+    fetchMedia, getMovieById, searchMedia,
     fetchReviewsByMediaId, fetchReviewsByUserId,
     getReviewsByMediaId, getReviewsByUserId,
     addReview, updateReview, deleteReview, toggleReviewLike,
