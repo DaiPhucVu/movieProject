@@ -1,37 +1,22 @@
-// backend/prisma/seed.js
-// Seeds the database with the 8 starter movies from src/data/mockData.js,
-// two demo accounts, and sample reviews. Designed to run on any team member's
-// machine after a fresh `prisma migrate dev`.
+// Seeds the database with the 8 starter movies and the shared DemoAcc1 account.
+// Designed to run on any team member's machine after `npx prisma migrate dev`.
 // Run:
 //   cd backend
 //   npx prisma db seed
-//
-// Safe to re-run — all writes use upsert / deleteMany + create so the database
-// always ends in the same state, regardless of what was there before.
-
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
-// ─── Demo accounts ──────────────────────────────────────────
-// Both accounts use password "12345678" for easy team testing.
-const demoAccounts = [
-  {
-    username:    'DemoAcc1',
-    displayName: 'Demo Account 1',
-    email:       'demoacc1@example.com',
-    password:    '12345678',
-  },
-  {
-    username:    'DemoAcc2',
-    displayName: 'Demo Account 2',
-    email:       'demoacc2@example.com',
-    password:    '12345678',
-  },
-]
+// ─── Demo account (shared across the team) ────────
+const demoAccount = {
+  username:    'DemoAcc1',
+  displayName: 'Demo Account 1',
+  email:       'demoacc1@example.com',
+  password:    '12345678',
+}
 
-// ─── Movies (mirrors src/data/mockData.js) ─────────────────
+// ─── Movies (mirrors src/data/mockData.js) ────────
 const mockMovies = [
   {
     id: 1, title: 'Dune: Part Two', type: 'movie', year: 2024,
@@ -107,44 +92,9 @@ const mockMovies = [
   },
 ]
 
-// ─── Sample reviews ─────────────────────────────────────────
-// Two reviews on Dune and on Oppenheimer (so sort/pagination
-// have real data to work on), one review on The Bear.
-// `demoIndex` refers to the index in demoAccounts above.
-const sampleReviews = [
-  {
-    mediaId: 1, demoIndex: 0, rating: 9,
-    content: "Villeneuve has done the impossible — made the unfilmable feel inevitable. Every frame is a painting. Zendaya's performance in the second half is career-defining.",
-    createdAt: '2024-03-02',
-  },
-  {
-    mediaId: 1, demoIndex: 1, rating: 8,
-    content: 'The spectacle is undeniable but I wish we spent more time with the Fremen culture. Still, this is blockbuster filmmaking at its most ambitious.',
-    createdAt: '2024-03-05',
-  },
-  {
-    mediaId: 2, demoIndex: 0, rating: 10,
-    content: 'Hoyte van Hoytema deserves another Oscar just for this. The practical effects, the IMAX compositions — this is why cinema exists.',
-    createdAt: '2023-07-25',
-  },
-  {
-    mediaId: 2, demoIndex: 1, rating: 9,
-    content: "A three-hour conversation about responsibility, hubris, and consequence. Nolan's tightest screenplay in years. The chamber scenes hum with dread.",
-    createdAt: '2023-08-01',
-  },
-  {
-    mediaId: 3, demoIndex: 0, rating: 9,
-    content: 'The kitchen sequences alone contain more tension than most thrillers. Jeremy Allen White is electric. Season 2\'s "Fishes" episode is a masterclass.',
-    createdAt: '2023-08-10',
-  },
-]
-
-// ─────────────────────────────────────────────────────────────
-
 async function main() {
   console.log('Seeding database…\n')
-
-  // 1. Movies — upsert so existing data is preserved/updated
+  // 1. Movies
   for (const m of mockMovies) {
     const data = {
       title: m.title, type: m.type, year: m.year,
@@ -161,47 +111,21 @@ async function main() {
   }
   console.log(`  ✓ ${mockMovies.length} movies`)
 
-  // 2. Demo accounts — upsert so passwords stay consistent across runs
-  const demoUsers = []
-  for (const acc of demoAccounts) {
-    const hashedPwd = await bcrypt.hash(acc.password, 10)
-    const user = await prisma.user.upsert({
-      where: { username: acc.username },
-      update: { password: hashedPwd },
-      create: {
-        username:    acc.username,
-        displayName: acc.displayName,
-        email:       acc.email,
-        password:    hashedPwd,
-      },
-    })
-    demoUsers.push(user)
-  }
-  console.log(`  ✓ ${demoAccounts.length} demo accounts (login password: 12345678)`)
-
-  // 3. Sample reviews — clear demo users' existing reviews, then re-create
-  // (only removes reviews from the demo accounts, not from real team members)
-  const demoUserIds = demoUsers.map(u => u.id)
-  await prisma.review.deleteMany({ where: { userId: { in: demoUserIds } } })
-
-  for (const r of sampleReviews) {
-    await prisma.review.create({
-      data: {
-        rating:    r.rating,
-        content:   r.content,
-        userId:    demoUsers[r.demoIndex].id,
-        mediaId:   r.mediaId,
-        createdAt: new Date(r.createdAt),
-      },
-    })
-  }
-  console.log(`  ✓ ${sampleReviews.length} sample reviews`)
+  // 2. Demo account
+  const hashedPwd = await bcrypt.hash(demoAccount.password, 10)
+  await prisma.user.upsert({
+    where: { username: demoAccount.username },
+    update: { password: hashedPwd },
+    create: {
+      username:    demoAccount.username,
+      displayName: demoAccount.displayName,
+      email:       demoAccount.email,
+      password:    hashedPwd,
+    },
+  })
+  console.log(`  ✓ ${demoAccount.username} ready (password: ${demoAccount.password})`)
 
   console.log('\nSeed complete.')
-  console.log('\nDemo logins:')
-  for (const acc of demoAccounts) {
-    console.log(`  • ${acc.username} / ${acc.password}`)
-  }
 }
 
 main()
