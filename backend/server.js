@@ -131,6 +131,33 @@ app.post('/api/reviews', authenticate, async (req, res) => {
   res.status(201).json({ review })
 })
 
+app.delete('/api/reviews/:id', authenticate, async (req, res) => {
+  const id = Number(req.params.id)
+
+  // Find the review and verify ownership
+  const review = await prisma.review.findUnique({ where: { id } })
+  if (!review) {
+    return res.status(404).json({ error: 'Review not found' })
+  }
+  if (review.userId !== req.userId) {
+    return res.status(403).json({ error: 'You can only delete your own reviews' })
+  }
+
+  // Delete the review
+  await prisma.review.delete({ where: { id } })
+
+  // Recalculate the Media's reviewCount and rating
+  await prisma.media.update({
+    where: { id: review.mediaId },
+    data: {
+      reviewCount: { decrement: 1 },
+      rating: { set: await calculateAverageRating(review.mediaId) },
+    },
+  })
+
+  res.json({ success: true })
+})
+
 app.get('/api/watchlist/:userId', authenticate, async (req, res) => {
   const userId = Number(req.params.userId)
   if (req.userId !== userId) return res.status(403).json({ error: 'Unauthorized' })
