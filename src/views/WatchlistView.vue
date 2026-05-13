@@ -1,7 +1,7 @@
 <template>
   <div class="watchlist-page py-5">
     <div class="container">
-      <!-- Page header -->
+      <!-- Page header — always renders so the page is never fully blank -->
       <header class="d-flex justify-content-between align-items-end flex-wrap gap-3 pb-3 mb-4 border-bottom border-secondary">
         <div>
           <h1 class="display-5 fw-bold text-light mb-1">
@@ -111,11 +111,13 @@
 
 <script setup>
 import { computed, ref, watch, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useMediaStore } from '../stores/media'
 import { useAuthStore } from '../stores/auth'
 import MediaCard from '../components/MediaCard.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 
+const route = useRoute()
 const mediaStore = useMediaStore()
 const auth = useAuthStore()
 
@@ -124,7 +126,9 @@ const PAGE_SIZE = 12
 const typeFilter = ref('all')
 const sortBy = ref('added')
 const currentPage = ref(1)
-const loading = ref(true)
+// Start at false so the empty state can render immediately if no data
+// (load() flips it on while a fetch is in flight)
+const loading = ref(false)
 
 const typeFilters = [
   { value: 'all', label: 'All' },
@@ -181,12 +185,29 @@ watch(totalPages, (newTotal) => {
   if (currentPage.value > newTotal) currentPage.value = newTotal
 })
 
-onMounted(async () => {
-  if (auth.user?.id) {
+// ── Data loading ───────────────────────────────────────────────────────────
+// Wrapped in a defensive function called from BOTH onMounted and a route
+// watcher, so the fetch fires reliably even when navigation timing is weird.
+async function loadWatchlist() {
+  if (!auth.isAuthenticated || !auth.user?.id) return
+  loading.value = true
+  try {
     await mediaStore.fetchWatchlist(auth.user.id)
+  } catch (err) {
+    console.error('Watchlist load failed:', err)
+  } finally {
+    loading.value = false
   }
-  loading.value = false
-})
+}
+
+onMounted(loadWatchlist)
+
+// Safety net: if the user lands on /watchlist for any reason (back button,
+// router navigation that bypasses onMounted, etc.), re-fetch.
+watch(
+  () => route.fullPath,
+  (newPath) => { if (newPath === '/watchlist') loadWatchlist() }
+)
 </script>
 
 <style scoped>
