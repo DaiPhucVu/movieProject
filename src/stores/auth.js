@@ -11,11 +11,12 @@ const API = 'http://localhost:3000/api'
 export const useAuthStore = defineStore('auth', () => {
 
   // ── State
-  // Restore user from localStorage on first load (persists across refreshes)
   const user = ref(JSON.parse(localStorage.getItem('cinelog_user')) || null)
+  const token = ref(localStorage.getItem('cinelog_token') || '')
 
   // ── Getters 
-  const isAuthenticated = computed(() => !!user.value)
+  const isAuthenticated = computed(() => !!user.value && !!token.value)
+  const authHeader = computed(() => token.value ? { Authorization: `Bearer ${token.value}` } : {})
 
   // ── Actions 
 
@@ -43,7 +44,9 @@ export const useAuthStore = defineStore('auth', () => {
 
       // Auto-login after successful registration
       user.value = data.user
+      token.value = data.token
       localStorage.setItem('cinelog_user', JSON.stringify(data.user))
+      localStorage.setItem('cinelog_token', data.token)
       return { success: true }
 
     } catch (err) {
@@ -69,7 +72,9 @@ export const useAuthStore = defineStore('auth', () => {
 
       // Save user to Pinia state + localStorage
       user.value = data.user
+      token.value = data.token
       localStorage.setItem('cinelog_user', JSON.stringify(data.user))
+      localStorage.setItem('cinelog_token', data.token)
       return { success: true }
 
     } catch (err) {
@@ -80,8 +85,10 @@ export const useAuthStore = defineStore('auth', () => {
   // logout() — clears the session everywhere
   function logout() {
     user.value = null
+    token.value = ''
     localStorage.removeItem('cinelog_user')
+    localStorage.removeItem('cinelog_token')
   }
 
-  return { user, isAuthenticated, login, register, logout }
+  return { user, token, isAuthenticated, authHeader, login, register, logout }
 })

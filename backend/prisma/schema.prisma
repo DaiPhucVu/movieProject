@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          Int        @id @default(autoincrement())
+  username    String     @unique
+  displayName String
+  email       String     @unique
+  password    String
+  createdAt   DateTime   @default(now())
+  reviews     Review[]
+  watchlist   Watchlist[]
+}
+
+model Media {
+  id          Int        @id @default(autoincrement())
+  title       String
+  type        String
+  year        Int
+  genre       String
+  rating      Float      @default(0)
+  reviewCount Int        @default(0)
+  likes       Int        @default(0)
+  poster      String?
+  backdrop    String?
+  synopsis    String?
+  director    String?
+  duration    String?
+  reviews     Review[]
+  watchlists  Watchlist[]
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  rating    Int
+  content   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  media     Media    @relation(fields: [mediaId], references: [id])
+  mediaId   Int
+}
+
+model Watchlist {
+  id      Int   @id @default(autoincrement())
+  user    User  @relation(fields: [userId], references: [id])
+  userId  Int
+  media   Media @relation(fields: [mediaId], references: [id])
+  mediaId Int
+
+  @@unique([userId, mediaId])
+}
