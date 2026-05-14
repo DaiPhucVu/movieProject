@@ -1,5 +1,4 @@
 <template>
-  <!-- Loaded media -->
   <div v-if="media" class="media-detail">
     <!-- Backdrop hero -->
     <section class="hero position-relative">
@@ -13,7 +12,7 @@
         <div class="row g-4 g-lg-5">
           <!-- Poster column -->
           <div class="col-12 col-md-5 col-lg-4">
-            <div class="poster-wrap rounded shadow-lg">
+            <div class="poster-wrap cl-border">
               <img :src="media.poster" :alt="media.title" class="poster-img w-100" />
             </div>
 
@@ -21,7 +20,7 @@
             <div class="d-flex flex-column gap-2 mt-3">
               <template v-if="auth.isAuthenticated">
                 <button
-                  class="btn btn-primary w-100"
+                  class="cl-btn cl-btn-primary w-100"
                   @click="mediaStore.toggleWatchlist(media.id, auth.user.id)"
                 >
                   {{ inWatchlist ? '✓ In Watchlist' : '+ Add to Watchlist' }}
@@ -29,63 +28,63 @@
                 <RouterLink
                   v-if="!hasUserReviewed"
                   :to="`/review/new/${media.id}`"
-                  class="btn btn-outline-light w-100"
+                  class="cl-btn cl-btn-ghost w-100"
                 >✍ Write a Review</RouterLink>
                 <RouterLink
                   v-else
                   :to="`/review/edit/${userReview.id}`"
-                  class="btn btn-outline-light w-100"
+                  class="cl-btn cl-btn-ghost w-100"
                 >✍ Edit Your Review</RouterLink>
               </template>
               <template v-else>
                 <RouterLink
                   :to="`/login?redirect=/media/${media.id}`"
-                  class="btn btn-primary w-100"
+                  class="cl-btn cl-btn-primary w-100"
                 >Sign in to interact</RouterLink>
               </template>
             </div>
           </div>
 
           <!-- Details column -->
-          <div class="col-12 col-md-7 col-lg-8 text-light">
+          <div class="col-12 col-md-7 col-lg-8">
             <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
-              <span class="badge bg-warning text-dark">
+              <span class="cl-badge cl-badge-accent">
                 {{ media.type === 'tv' ? 'TV Series' : 'Film' }}
               </span>
-              <span class="text-muted">·</span>
-              <span class="text-muted small">{{ media.year }}</span>
-              <span class="text-muted">·</span>
-              <span class="text-muted small">{{ media.duration }}</span>
+              <span class="cl-dim">·</span>
+              <span class="cl-muted small">{{ media.year }}</span>
+              <span class="cl-dim">·</span>
+              <span class="cl-muted small">{{ media.duration }}</span>
             </div>
 
-            <h1 class="display-4 fw-bold mb-3">{{ media.title }}</h1>
+            <h1 class="cl-display detail-title mb-3">{{ media.title }}</h1>
 
             <div class="d-flex align-items-center gap-3 flex-wrap mb-3">
               <div class="d-flex align-items-baseline gap-1">
-                <span class="text-warning">★</span>
-                <span class="fs-3 fw-bold text-warning">{{ averageRating }}</span>
-                <span class="text-muted small">/10</span>
+                <span class="cl-accent">★</span>
+                <span class="rating-value cl-accent">{{ averageRating }}</span>
+                <span class="cl-dim small">/10</span>
               </div>
-              <span class="text-muted small">
+              <span class="cl-muted small">
                 {{ reviews.length }} {{ reviews.length === 1 ? 'review' : 'reviews' }}
               </span>
-              <span class="text-muted small">❤ {{ formatNum(media.likes) }}</span>
+              <span class="cl-muted small">❤ {{ formatNum(media.likes) }}</span>
             </div>
 
             <div class="d-flex flex-wrap gap-2 mb-3">
               <span v-for="g in media.genre" :key="g" class="genre-tag">{{ g }}</span>
             </div>
 
-            <p class="lead mb-4">{{ media.synopsis }}</p>
+            <p class="synopsis mb-4">{{ media.synopsis }}</p>
 
-            <div class="credits border-top border-secondary pt-3">
-              <div class="row g-2 py-2 border-bottom border-secondary">
-                <div class="col-4 col-md-3 text-uppercase small text-muted credit-label">Director</div>
-                <div class="col-8 col-md-9 small">{{ media.director }}</div>
+            <div class="credits cl-border-t pt-3">
+              <div class="row g-2 py-2 cl-border-b">
+                <div class="col-4 col-md-3 cl-dim small credit-label">Director</div>
+                <div class="col-8 col-md-9 cl-muted small">{{ media.director }}</div>
               </div>
-              <div class="row g-2 py-2 border-bottom border-secondary">
-                <div class="col-4 col-md-3 text-uppercase small text-muted credit-label">Cast</div>
-                <div class="col-8 col-md-9 small">{{ media.cast?.join(', ') }}</div>
+              <div class="row g-2 py-2 cl-border-b">
+                <div class="col-4 col-md-3 cl-dim small credit-label">Cast</div>
+                <div class="col-8 col-md-9 cl-muted small">{{ media.cast?.join(', ') }}</div>
               </div>
             </div>
           </div>
@@ -94,13 +93,15 @@
     </section>
 
     <!-- Reviews section -->
-    <section class="section py-5">
+    <section class="py-5">
       <div class="container">
         <div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
-          <h2 class="text-light mb-0">Collective <span class="text-warning">Reviews</span></h2>
+          <h2 class="cl-display section-title mb-0">
+            Collective <span class="cl-accent">Reviews</span>
+          </h2>
           <div v-if="reviews.length > 1" class="d-flex align-items-center gap-2">
-            <label class="small text-muted text-uppercase" for="sort-reviews">Sort by</label>
-            <select id="sort-reviews" v-model="sortBy" class="form-select form-select-sm bg-dark text-light border-secondary w-auto">
+            <label class="cl-dim small text-uppercase sort-label" for="sort-reviews">Sort by</label>
+            <select id="sort-reviews" v-model="sortBy" class="cl-select cl-btn-sm">
               <option value="recent">Most Recent</option>
               <option value="oldest">Oldest First</option>
               <option value="top">Highest Rated</option>
@@ -110,23 +111,23 @@
         </div>
 
         <!-- Loading state -->
-        <div v-if="loadingReviews" class="text-center py-5 text-muted">
+        <div v-if="loadingReviews" class="text-center py-5 cl-muted">
           <p class="mb-0">Loading reviews…</p>
         </div>
 
         <!-- Empty state -->
-        <div v-else-if="reviews.length === 0" class="bg-dark border border-secondary rounded p-5 text-center">
-          <h3 class="h4 text-light mb-2">No reviews yet</h3>
-          <p class="text-muted mb-4">Be the first to share your thoughts on {{ media.title }}.</p>
+        <div v-else-if="reviews.length === 0" class="empty-state cl-card p-5 text-center">
+          <h3 class="cl-display h4 mb-2">No reviews yet</h3>
+          <p class="cl-muted mb-4">Be the first to share your thoughts on {{ media.title }}.</p>
           <RouterLink
             v-if="auth.isAuthenticated"
             :to="`/review/new/${media.id}`"
-            class="btn btn-primary"
+            class="cl-btn cl-btn-primary"
           >Write the first review</RouterLink>
           <RouterLink
             v-else
             :to="`/login?redirect=/media/${media.id}`"
-            class="btn btn-primary"
+            class="cl-btn cl-btn-primary"
           >Sign in to review</RouterLink>
         </div>
 
@@ -134,7 +135,7 @@
         <div v-else>
           <div class="row g-3">
             <div v-for="r in pagedReviews" :key="r.id" class="col-12">
-              <div class="bg-dark rounded p-3">
+              <div class="cl-card p-3">
                 <ReviewCard :review="r" @delete="handleDelete" />
               </div>
             </div>
@@ -150,10 +151,10 @@
   </div>
 
   <!-- Not found state -->
-  <div v-else class="container text-center py-5 text-light">
-    <h1 class="display-1 text-warning fw-bold">404</h1>
-    <p class="lead text-muted mb-4">We couldn't find that title.</p>
-    <RouterLink to="/" class="btn btn-primary">Back to Home</RouterLink>
+  <div v-else class="container text-center py-5">
+    <h1 class="cl-display nf-title cl-accent">404</h1>
+    <p class="cl-muted mb-4">We couldn't find that title.</p>
+    <RouterLink to="/" class="cl-btn cl-btn-primary">Back to Home</RouterLink>
   </div>
 </template>
 
@@ -228,7 +229,7 @@ watch(totalPages, (newTotal) => {
   if (currentPage.value > newTotal) currentPage.value = newTotal
 })
 
-// ── Data loading ───────────────────────────────────────────────────────────
+// ── Data loading ─────────────────────────────────────
 async function loadReviews() {
   if (!media.value) return
   loadingReviews.value = true
@@ -239,7 +240,7 @@ async function loadReviews() {
 onMounted(loadReviews)
 watch(mediaId, loadReviews)
 
-// ── Actions ───────────────────────────────────────────────────────────────
+// ── Actions ──────────────────────────────────────────
 async function handleDelete(reviewId) {
   if (!auth.user?.id) return
   if (!confirm('Delete this review? This cannot be undone.')) return
@@ -255,8 +256,7 @@ function formatNum(n) {
 </script>
 
 <style scoped>
-/* Only styles Bootstrap can't do — hero gradient, poster aspect ratio, genre tags */
-
+/* ---------- Hero ---------- */
 .hero {
   height: 50vh;
   min-height: 320px;
@@ -269,10 +269,11 @@ function formatNum(n) {
   opacity: 0.4;
 }
 .hero-gradient {
-  background: linear-gradient(to top, #000 0%, rgba(0,0,0,0.55) 50%, transparent 100%);
+  background: linear-gradient(to top, var(--cl-bg) 0%, rgba(10,10,15,0.55) 50%, transparent 100%);
   pointer-events: none;
 }
 
+/* ---------- Info section ---------- */
 .info-section {
   margin-top: -180px;
   z-index: 1;
@@ -282,12 +283,26 @@ function formatNum(n) {
 .poster-wrap {
   aspect-ratio: 2 / 3;
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--cl-radius-lg);
+  box-shadow: 0 30px 60px rgba(0,0,0,0.6);
 }
 .poster-img {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+/* ---------- Detail meta ---------- */
+.detail-title {
+  font-size: clamp(2rem, 5vw, 3.6rem);
+  letter-spacing: 0.03em;
+  line-height: 1;
+  color: var(--cl-text);
+}
+
+.rating-value {
+  font-size: 1.6rem;
+  font-weight: 600;
 }
 
 .genre-tag {
@@ -296,17 +311,47 @@ function formatNum(n) {
   letter-spacing: 0.06em;
   padding: 4px 10px;
   border-radius: 100px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.12);
-  color: #a8a8b3;
+  background: var(--cl-surface);
+  border: 1px solid var(--cl-border);
+  color: var(--cl-text-muted);
+}
+
+.synopsis {
+  font-size: 0.98rem;
+  line-height: 1.75;
+  color: var(--cl-text);
+  max-width: 65ch;
 }
 
 .credit-label {
   letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
   padding-top: 2px;
 }
 
-/* Responsive overlap adjustments */
+/* ---------- Reviews section ---------- */
+.section-title {
+  font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+  color: var(--cl-text);
+}
+
+.sort-label {
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+}
+
+.empty-state {
+  border-style: dashed;
+}
+
+/* ---------- 404 ---------- */
+.nf-title {
+  font-size: 6rem;
+  letter-spacing: 0.05em;
+}
+
+/* ---------- Responsive ---------- */
 @media (max-width: 991.98px) {
   .info-section { margin-top: -120px; }
 }
