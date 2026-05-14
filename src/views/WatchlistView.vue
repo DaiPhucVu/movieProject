@@ -1,13 +1,13 @@
 <template>
   <div class="watchlist-page py-5">
     <div class="container">
-      <!-- Page header — always renders so the page is never fully blank -->
-      <header class="d-flex justify-content-between align-items-end flex-wrap gap-3 pb-3 mb-4 border-bottom border-secondary">
+      <!-- Page header -->
+      <header class="d-flex justify-content-between align-items-end flex-wrap gap-3 pb-3 mb-4 cl-border-b">
         <div>
-          <h1 class="display-5 fw-bold text-light mb-1">
-            My <span class="text-warning">Watchlist</span>
+          <h1 class="cl-display page-title mb-1">
+            My <span class="cl-accent">Watchlist</span>
           </h1>
-          <p class="text-muted small mb-0">
+          <p class="cl-muted small mb-0">
             <template v-if="loading">Loading…</template>
             <template v-else-if="watchlistMovies.length === 0">Nothing saved yet</template>
             <template v-else-if="watchlistMovies.length === 1">1 title saved</template>
@@ -18,35 +18,35 @@
         <!-- Quick stats -->
         <div v-if="!loading && watchlistMovies.length > 0" class="d-flex gap-4">
           <div class="text-center">
-            <div class="fs-3 fw-bold text-warning lh-1">{{ movieCount }}</div>
-            <div class="small text-muted text-uppercase mt-1 stat-label">Films</div>
+            <div class="cl-display cl-accent stat-val">{{ movieCount }}</div>
+            <div class="cl-dim stat-label">Films</div>
           </div>
           <div class="text-center">
-            <div class="fs-3 fw-bold text-warning lh-1">{{ tvCount }}</div>
-            <div class="small text-muted text-uppercase mt-1 stat-label">Series</div>
+            <div class="cl-display cl-accent stat-val">{{ tvCount }}</div>
+            <div class="cl-dim stat-label">Series</div>
           </div>
           <div class="text-center">
-            <div class="fs-3 fw-bold text-warning lh-1">{{ avgRating }}</div>
-            <div class="small text-muted text-uppercase mt-1 stat-label">Avg ★</div>
+            <div class="cl-display cl-accent stat-val">{{ avgRating }}</div>
+            <div class="cl-dim stat-label">Avg ★</div>
           </div>
         </div>
       </header>
 
       <!-- Loading -->
-      <div v-if="loading" class="text-center py-5 text-muted">
+      <div v-if="loading" class="text-center py-5 cl-muted">
         <p class="mb-0">Loading your watchlist…</p>
       </div>
 
       <!-- Empty state -->
-      <div v-else-if="watchlistMovies.length === 0" class="bg-dark border border-secondary rounded p-5 text-center mx-auto" style="max-width: 560px;">
-        <div class="display-1 mb-3 opacity-50">🎬</div>
-        <h2 class="h4 text-light mb-2">Your watchlist is empty</h2>
-        <p class="text-muted mb-4">
+      <div v-else-if="watchlistMovies.length === 0" class="cl-card empty-state p-5 text-center mx-auto">
+        <div class="empty-icon mb-3">🎬</div>
+        <h2 class="cl-display h4 mb-2">Your watchlist is empty</h2>
+        <p class="cl-muted mb-4">
           Save films and series you want to watch later. Start by exploring what's trending or search for something specific.
         </p>
         <div class="d-flex gap-2 justify-content-center flex-wrap">
-          <RouterLink to="/trending" class="btn btn-primary">Browse Trending</RouterLink>
-          <RouterLink to="/search" class="btn btn-outline-light">Search Titles</RouterLink>
+          <RouterLink to="/trending" class="cl-btn cl-btn-primary">Browse Trending</RouterLink>
+          <RouterLink to="/search" class="cl-btn cl-btn-ghost">Search Titles</RouterLink>
         </div>
       </div>
 
@@ -54,26 +54,24 @@
       <template v-else>
         <div class="row g-3 align-items-center mb-4">
           <div class="col-12 col-md-7 col-lg-8">
-            <div class="btn-group" role="group" aria-label="Filter by type">
+            <div class="filter-tabs" role="tablist">
               <button
                 v-for="opt in typeFilters" :key="opt.value"
                 type="button"
-                class="btn btn-sm"
-                :class="typeFilter === opt.value ? 'btn-warning' : 'btn-outline-light'"
+                class="filter-tab"
+                :class="{ 'filter-tab-active': typeFilter === opt.value }"
                 @click="typeFilter = opt.value"
               >
                 {{ opt.label }}
-                <span class="badge ms-1" :class="typeFilter === opt.value ? 'bg-dark text-warning' : 'bg-secondary'">
-                  {{ countByType(opt.value) }}
-                </span>
+                <span class="filter-count">{{ countByType(opt.value) }}</span>
               </button>
             </div>
           </div>
 
           <div class="col-12 col-md-5 col-lg-4">
             <div class="d-flex align-items-center gap-2 justify-content-md-end">
-              <label class="small text-muted text-uppercase mb-0" for="sort-watchlist">Sort by</label>
-              <select id="sort-watchlist" v-model="sortBy" class="form-select form-select-sm bg-dark text-light border-secondary w-auto">
+              <label class="cl-dim sort-label" for="sort-watchlist">Sort by</label>
+              <select id="sort-watchlist" v-model="sortBy" class="cl-select cl-btn-sm">
                 <option value="added">Recently Added</option>
                 <option value="title">Title (A–Z)</option>
                 <option value="rating">Highest Rated</option>
@@ -84,7 +82,7 @@
         </div>
 
         <!-- Filtered empty state -->
-        <div v-if="filteredSorted.length === 0" class="text-center py-5 text-muted">
+        <div v-if="filteredSorted.length === 0" class="text-center py-5 cl-muted">
           <p class="mb-0">No {{ typeFilter === 'tv' ? 'series' : 'films' }} in your watchlist yet.</p>
         </div>
 
@@ -126,8 +124,6 @@ const PAGE_SIZE = 12
 const typeFilter = ref('all')
 const sortBy = ref('added')
 const currentPage = ref(1)
-// Start at false so the empty state can render immediately if no data
-// (load() flips it on while a fetch is in flight)
 const loading = ref(false)
 
 const typeFilters = [
@@ -185,9 +181,6 @@ watch(totalPages, (newTotal) => {
   if (currentPage.value > newTotal) currentPage.value = newTotal
 })
 
-// ── Data loading ───────────────────────────────────────────────────────────
-// Wrapped in a defensive function called from BOTH onMounted and a route
-// watcher, so the fetch fires reliably even when navigation timing is weird.
 async function loadWatchlist() {
   if (!auth.isAuthenticated || !auth.user?.id) return
   loading.value = true
@@ -202,8 +195,7 @@ async function loadWatchlist() {
 
 onMounted(loadWatchlist)
 
-// Safety net: if the user lands on /watchlist for any reason (back button,
-// router navigation that bypasses onMounted, etc.), re-fetch.
+// Safety net: re-fetch on route changes back to /watchlist
 watch(
   () => route.fullPath,
   (newPath) => { if (newPath === '/watchlist') loadWatchlist() }
@@ -213,5 +205,91 @@ watch(
 <style scoped>
 .watchlist-page { min-height: 70vh; }
 
-.stat-label { letter-spacing: 0.08em; font-size: 0.7rem; }
+/* ---------- Header ---------- */
+.page-title {
+  font-size: clamp(2.2rem, 5vw, 3.4rem);
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: var(--cl-text);
+}
+
+.stat-val {
+  font-size: 1.8rem;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+.stat-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 6px;
+}
+
+/* ---------- Empty state ---------- */
+.empty-state {
+  border-style: dashed;
+  max-width: 560px;
+}
+.empty-icon {
+  font-size: 3rem;
+  opacity: 0.6;
+}
+
+/* ---------- Filter pills ---------- */
+.filter-tabs {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--cl-surface);
+  border: 1px solid var(--cl-border);
+  border-radius: 100px;
+  padding: 4px;
+}
+.filter-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  border-radius: 100px;
+  background: transparent;
+  border: none;
+  font-size: 0.85rem;
+  color: var(--cl-text-muted);
+  font-family: var(--cl-font-body);
+  cursor: pointer;
+  transition: all var(--cl-transition);
+}
+.filter-tab:hover {
+  color: var(--cl-text);
+}
+.filter-tab-active {
+  background: var(--cl-accent);
+  color: var(--cl-bg);
+  font-weight: 500;
+}
+.filter-count {
+  font-size: 0.72rem;
+  padding: 1px 7px;
+  border-radius: 100px;
+  background: rgba(255,255,255,0.08);
+}
+.filter-tab-active .filter-count {
+  background: rgba(0,0,0,0.18);
+  color: var(--cl-bg);
+}
+
+/* ---------- Sort label ---------- */
+.sort-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 767.98px) {
+  .filter-tabs { width: 100%; overflow-x: auto; }
+  .filter-tab { flex-shrink: 0; }
+}
+@media (max-width: 575.98px) {
+  .filter-tab { padding: 6px 12px; font-size: 0.8rem; }
+}
 </style>
