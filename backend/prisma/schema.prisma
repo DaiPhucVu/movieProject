@@ -15,7 +15,6 @@ model User {
   password    String
   createdAt   DateTime   @default(now())
   reviews     Review[]
-  watchlist   Watchlist[]
 }
 
 model Media {
@@ -33,7 +32,7 @@ model Media {
   director    String?
   duration    String?
   reviews     Review[]
-  watchlists  Watchlist[]
+
 }
 
 model Review {
@@ -48,11 +47,10 @@ model Review {
 }
 
 model Watchlist {
-  id      Int   @id @default(autoincrement())
-  user    User  @relation(fields: [userId], references: [id])
+  id      Int @id @default(autoincrement())
   userId  Int
-  media   Media @relation(fields: [mediaId], references: [id])
   mediaId Int
+  type    String @default("movie")
 
   @@unique([userId, mediaId])
 }
