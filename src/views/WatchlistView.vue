@@ -93,16 +93,7 @@
               v-for="m in pagedItems" :key="m.id"
               class="col-6 col-md-4 col-lg-3 col-xl-2"
             >
-              <div class="position-relative">
-                <MediaCard :media="m" />
-
-                <button
-                  class="btn btn-sm btn-danger position-absolute bottom-0 end-0 m-2"
-                  @click="removeFromWatchlist(m)"
-                >
-                  ✕
-                </button>
-              </div>
+              <MediaCard :media="m" />
             </div>
           </div>
 
@@ -135,25 +126,26 @@ const sortBy = ref('added')
 const currentPage = ref(1)
 const loading = ref(false)
 
-const watchlistMovies = ref([])
-
 const typeFilters = [
   { value: 'all', label: 'All' },
   { value: 'movie', label: 'Films' },
   { value: 'tv', label: 'Series' },
 ]
 
-const movieCount = computed(() =>
-  watchlistMovies.value.filter(m => m.type === 'movie').length
-)
+// Resolve watchlist items into full movie objects via the TMDB store cache.
+// Items that couldn't be loaded (e.g. network failure) are skipped.
+const watchlistMovies = computed(() => {
+  return mediaStore.watchlist
+    .map(item => mediaStore.getMovieById(item.mediaId))
+    .filter(m => m != null)
+})
 
-const tvCount = computed(() =>
-  watchlistMovies.value.filter(m => m.type === 'tv').length
-)
+const movieCount = computed(() => watchlistMovies.value.filter(m => m.type === 'movie').length)
+const tvCount = computed(() => watchlistMovies.value.filter(m => m.type === 'tv').length)
 
 const avgRating = computed(() => {
-  if (!watchlistMovies.value.length) return '–'
-  const sum = watchlistMovies.value.reduce((a, m) => a + (m.rating || 0), 0)
+  if (watchlistMovies.value.length === 0) return '–'
+  const sum = watchlistMovies.value.reduce((acc, m) => acc + (m.rating || 0), 0)
   return (sum / watchlistMovies.value.length).toFixed(1)
 })
 
@@ -164,20 +156,18 @@ function countByType(t) {
 
 const filteredSorted = computed(() => {
   let list = watchlistMovies.value
-
   if (typeFilter.value !== 'all') {
     list = list.filter(m => m.type === typeFilter.value)
   }
-
   list = [...list]
-
   switch (sortBy.value) {
     case 'title':
-      return list.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
+      return list.sort((a, b) => a.title.localeCompare(b.title))
     case 'rating':
-      return list.sort((a, b) => (b.rating || 0) - (a.rating || 0))
+      return list.sort((a, b) => b.rating - a.rating)
     case 'year':
-      return list.sort((a, b) => (b.year || 0) - (a.year || 0))
+      return list.sort((a, b) => b.year - a.year)
+    case 'added':
     default:
       return list
   }
@@ -192,74 +182,50 @@ const pagedItems = computed(() => {
   return filteredSorted.value.slice(start, start + PAGE_SIZE)
 })
 
-watch([typeFilter, sortBy], () => {
-  currentPage.value = 1
+watch([typeFilter, sortBy], () => { currentPage.value = 1 })
+watch(totalPages, (newTotal) => {
+  if (currentPage.value > newTotal) currentPage.value = newTotal
 })
 
-watch(totalPages, (n) => {
-  if (currentPage.value > n) currentPage.value = n
-})
-
-/* ---------------- FIXED LOAD ---------------- */
+// ── Data loading ──
+// 1. Fetch the user's watchlist (array of {mediaId, type} from backend)
+// 2. For each item, ask the store to load its TMDB detail into the cache
+//    (loadDetail caches in detailCache, getMovieById reads from there)
 async function loadWatchlist() {
   if (!auth.isAuthenticated || !auth.user?.id) return
-
   loading.value = true
-
   try {
     await mediaStore.fetchWatchlist(auth.user.id)
 
-    const items = mediaStore.getWatchlistItems()
-
-    // safety cleanup (THIS prevents blank page crashes)
-    const cleanItems = items
-      .filter(i => i && i.mediaId)
-      .map(i => ({
-        id: Number(i.mediaId),
-        type: i.type || 'movie'
-      }))
-
-    const results = await Promise.all(
-      cleanItems.map(item =>
-        mediaStore.loadDetail(item.id, item.type)
+    // Load TMDB detail for each watchlist item in parallel.
+    // Failures are caught so a single bad item doesn't block the rest.
+    await Promise.all(
+      mediaStore.watchlist.map(item =>
+        mediaStore.loadDetail(item.mediaId, item.type).catch(err => {
+          console.warn(`Could not load detail for ${item.type}/${item.mediaId}:`, err)
+        })
       )
     )
-
-    watchlistMovies.value = results
-      .filter(Boolean)
-      .map(m => ({
-        ...m,
-        type: m.type || 'movie'
-      }))
-
   } catch (err) {
     console.error('Watchlist load failed:', err)
-    watchlistMovies.value = []
   } finally {
     loading.value = false
   }
 }
-/* Remove Movies/Tv from watchlist */
-function removeFromWatchlist(m) {
-  mediaStore.toggleWatchlist(m.id, m.type)
-  watchlistMovies.value =
-    watchlistMovies.value.filter(x => x.id !== m.id)
-}
 
 onMounted(loadWatchlist)
 
+// Safety net: re-fetch when arriving at /watchlist via router navigation
 watch(
   () => route.fullPath,
-  (p) => {
-    if (p === '/watchlist') loadWatchlist()
-  }
+  (newPath) => { if (newPath === '/watchlist') loadWatchlist() }
 )
 </script>
 
 <style scoped>
 .watchlist-page { min-height: 70vh; }
 
-/* ---------- Header ---------- */
+/* -- Header -- */
 .page-title {
   font-size: clamp(2.2rem, 5vw, 3.4rem);
   letter-spacing: 0.04em;
@@ -279,7 +245,7 @@ watch(
   margin-top: 6px;
 }
 
-/* ---------- Empty state ---------- */
+/* -- Empty state -- */
 .empty-state {
   border-style: dashed;
   max-width: 560px;
@@ -289,7 +255,7 @@ watch(
   opacity: 0.6;
 }
 
-/* ---------- Filter pills ---------- */
+/* -- Filter pills -- */
 .filter-tabs {
   display: inline-flex;
   gap: 4px;
@@ -331,14 +297,12 @@ watch(
   color: var(--cl-bg);
 }
 
-/* ---------- Sort label ---------- */
 .sort-label {
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
-/* ---------- Responsive ---------- */
 @media (max-width: 767.98px) {
   .filter-tabs { width: 100%; overflow-x: auto; }
   .filter-tab { flex-shrink: 0; }
