@@ -93,7 +93,16 @@
               v-for="m in pagedItems" :key="m.id"
               class="col-6 col-md-4 col-lg-3 col-xl-2"
             >
-              <MediaCard :media="m" />
+              <div class="position-relative">
+                <MediaCard :media="m" />
+
+                <button
+                  class="btn btn-sm btn-danger position-absolute bottom-0 end-0 m-2"
+                  @click="removeFromWatchlist(m)"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
           </div>
 
@@ -126,20 +135,25 @@ const sortBy = ref('added')
 const currentPage = ref(1)
 const loading = ref(false)
 
+const watchlistMovies = ref([])
+
 const typeFilters = [
   { value: 'all', label: 'All' },
   { value: 'movie', label: 'Films' },
   { value: 'tv', label: 'Series' },
 ]
 
-const watchlistMovies = computed(() => mediaStore.getWatchlistMovies())
+const movieCount = computed(() =>
+  watchlistMovies.value.filter(m => m.type === 'movie').length
+)
 
-const movieCount = computed(() => watchlistMovies.value.filter(m => m.type === 'movie').length)
-const tvCount = computed(() => watchlistMovies.value.filter(m => m.type === 'tv').length)
+const tvCount = computed(() =>
+  watchlistMovies.value.filter(m => m.type === 'tv').length
+)
 
 const avgRating = computed(() => {
-  if (watchlistMovies.value.length === 0) return '–'
-  const sum = watchlistMovies.value.reduce((acc, m) => acc + (m.rating || 0), 0)
+  if (!watchlistMovies.value.length) return '–'
+  const sum = watchlistMovies.value.reduce((a, m) => a + (m.rating || 0), 0)
   return (sum / watchlistMovies.value.length).toFixed(1)
 })
 
@@ -150,18 +164,20 @@ function countByType(t) {
 
 const filteredSorted = computed(() => {
   let list = watchlistMovies.value
+
   if (typeFilter.value !== 'all') {
     list = list.filter(m => m.type === typeFilter.value)
   }
+
   list = [...list]
+
   switch (sortBy.value) {
     case 'title':
-      return list.sort((a, b) => a.title.localeCompare(b.title))
+      return list.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
     case 'rating':
-      return list.sort((a, b) => b.rating - a.rating)
+      return list.sort((a, b) => (b.rating || 0) - (a.rating || 0))
     case 'year':
-      return list.sort((a, b) => b.year - a.year)
-    case 'added':
+      return list.sort((a, b) => (b.year || 0) - (a.year || 0))
     default:
       return list
   }
@@ -176,29 +192,67 @@ const pagedItems = computed(() => {
   return filteredSorted.value.slice(start, start + PAGE_SIZE)
 })
 
-watch([typeFilter, sortBy], () => { currentPage.value = 1 })
-watch(totalPages, (newTotal) => {
-  if (currentPage.value > newTotal) currentPage.value = newTotal
+watch([typeFilter, sortBy], () => {
+  currentPage.value = 1
 })
 
+watch(totalPages, (n) => {
+  if (currentPage.value > n) currentPage.value = n
+})
+
+/* ---------------- FIXED LOAD ---------------- */
 async function loadWatchlist() {
   if (!auth.isAuthenticated || !auth.user?.id) return
+
   loading.value = true
+
   try {
     await mediaStore.fetchWatchlist(auth.user.id)
+
+    const items = mediaStore.getWatchlistItems()
+
+    // safety cleanup (THIS prevents blank page crashes)
+    const cleanItems = items
+      .filter(i => i && i.mediaId)
+      .map(i => ({
+        id: Number(i.mediaId),
+        type: i.type || 'movie'
+      }))
+
+    const results = await Promise.all(
+      cleanItems.map(item =>
+        mediaStore.loadDetail(item.id, item.type)
+      )
+    )
+
+    watchlistMovies.value = results
+      .filter(Boolean)
+      .map(m => ({
+        ...m,
+        type: m.type || 'movie'
+      }))
+
   } catch (err) {
     console.error('Watchlist load failed:', err)
+    watchlistMovies.value = []
   } finally {
     loading.value = false
   }
 }
+/* Remove Movies/Tv from watchlist */
+function removeFromWatchlist(m) {
+  mediaStore.toggleWatchlist(m.id, m.type)
+  watchlistMovies.value =
+    watchlistMovies.value.filter(x => x.id !== m.id)
+}
 
 onMounted(loadWatchlist)
 
-// Safety net: re-fetch on route changes back to /watchlist
 watch(
   () => route.fullPath,
-  (newPath) => { if (newPath === '/watchlist') loadWatchlist() }
+  (p) => {
+    if (p === '/watchlist') loadWatchlist()
+  }
 )
 </script>
 

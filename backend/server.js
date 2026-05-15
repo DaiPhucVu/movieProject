@@ -163,28 +163,51 @@ app.get('/api/watchlist/:userId', authenticate, async (req, res) => {
   if (req.userId !== userId) return res.status(403).json({ error: 'Unauthorized' })
 
   const items = await prisma.watchlist.findMany({
-    where: { userId },
-    include: { media: true },
+  where: { userId },
   })
-  res.json({ watchlist: items.map(item => item.media) })
+
+  res.json({ watchlist: items })
 })
 
 app.post('/api/watchlist/toggle', authenticate, async (req, res) => {
-  const { mediaId } = req.body
-  if (!mediaId) return res.status(400).json({ error: 'Missing mediaId' })
+  try {
+    const { mediaId } = req.body
 
-  const existing = await prisma.watchlist.findFirst({
-    where: { userId: req.userId, mediaId },
-  })
-  if (existing) {
-    await prisma.watchlist.delete({ where: { id: existing.id } })
-    return res.json({ saved: false })
+    if (!mediaId) {
+      return res.status(400).json({ error: 'Missing mediaId' })
+    }
+
+    const existing = await prisma.watchlist.findFirst({
+      where: {
+        userId: req.userId,
+        mediaId: Number(mediaId)
+      },
+    })
+
+    if (existing) {
+      await prisma.watchlist.delete({
+        where: { id: existing.id }
+      })
+
+      return res.json({ saved: false })
+    }
+
+    await prisma.watchlist.create({
+      data: {
+        userId: req.userId,
+        mediaId: Number(mediaId)
+      }
+    })
+
+    return res.json({ saved: true })
+
+  } catch (err) {
+    console.error('WATCHLIST ERROR:', err)
+
+    return res.status(500).json({
+      error: 'Failed to update watchlist'
+    })
   }
-
-  await prisma.watchlist.create({
-    data: { userId: req.userId, mediaId },
-  })
-  res.json({ saved: true })
 })
 
 async function calculateAverageRating(mediaId) {
