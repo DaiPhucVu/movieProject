@@ -43,7 +43,7 @@ const inWatchlist = computed(() => mediaStore.isInWatchlist(props.media.id))
 
 function toggleWatchlist() {
   if (!auth.isAuthenticated) return
-  mediaStore.toggleWatchlist(props.media.id, auth.user.id)
+  mediaStore.toggleWatchlist(props.media.id, props.media.type)
 }
 
 function formatNum(n) {
