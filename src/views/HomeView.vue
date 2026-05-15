@@ -39,7 +39,7 @@
           <button
             v-if="auth.isAuthenticated"
             class="btn btn-outline-light"
-            @click="mediaStore.toggleWatchlist(featured.id)"
+            @click="mediaStore.toggleWatchlist(featured.id, featured.type)"
           >
             {{ mediaStore.isInWatchlist(featured.id) ? '✓ In Watchlist' : '+ Watchlist' }}
           </button>
