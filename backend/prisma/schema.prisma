@@ -17,6 +17,9 @@ model User {
   reviews     Review[]
 }
 
+// Media model kept for reference / future use, but no longer
+// linked to Review or Watchlist via FK. Movies now come from TMDB,
+// so this table is effectively unused at runtime.
 model Media {
   id          Int        @id @default(autoincrement())
   title       String
@@ -31,10 +34,10 @@ model Media {
   synopsis    String?
   director    String?
   duration    String?
-  reviews     Review[]
-
 }
 
+// mediaId is now a loose Int holding the TMDB id of the reviewed title.
+// No FK to Media — movies come from TMDB API, not the local table.
 model Review {
   id        Int      @id @default(autoincrement())
   rating    Int
@@ -42,7 +45,6 @@ model Review {
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
   userId    Int
-  media     Media    @relation(fields: [mediaId], references: [id])
   mediaId   Int
 }
 
