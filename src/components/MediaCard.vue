@@ -1,5 +1,5 @@
 <template>
-  <RouterLink :to="`/media/${media.id}`" class="media-card">
+  <RouterLink :to="{ name: 'MediaDetail', params: { id: media.id }, query: { type: media.type } }" class="media-card">
     <div class="card-poster">
       <img :src="media.poster" :alt="media.title" loading="lazy" />
       <div class="card-overlay">
