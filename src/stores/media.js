@@ -4,7 +4,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
-import { mockMovies } from '../data/mockData'
+import {fetchTrending, fetchPopularMovies, fetchPopularTV, searchTMDB, discoverMedia, fetchDetail,} from '../services/tmdb'
 
 const API = 'http://localhost:3000/api'
 
@@ -13,10 +13,14 @@ export const useMediaStore = defineStore('media', () => {
   // ── State
   const auth = useAuthStore()
 
-  const movies    = ref([...mockMovies])
+  const movies    = ref([])
+  const detailCache = ref({})
   const reviews   = ref([])
-  const watchlist = ref([])
-  const likedMedia = ref([])
+  const watchlist  = ref(JSON.parse(localStorage.getItem('cinelog_watchlist')) || [])
+  const likedMedia = ref(JSON.parse(localStorage.getItem('cinelog_liked')) || [])
+  const loading    = ref(false)
+  const error      = ref('')
+
   // ── Computed 
   const trending = computed(() =>
     [...movies.value].sort((a, b) => b.rating - a.rating).slice(0, 6)
@@ -26,27 +30,93 @@ export const useMediaStore = defineStore('media', () => {
     return auth.token ? { Authorization: `Bearer ${auth.token}` } : {}
   }
 
-  // ── Backend media
-  async function fetchMedia() {
-    try {
-      const res = await fetch(`${API}/media`)
-      const data = await res.json()
-      if (res.ok && data.media) {
-        movies.value = data.media
-        return { success: true }
-      }
-      return { success: false, error: data.error || 'Could not load movies' }
-    } catch (err) {
-      console.error('fetchMedia error:', err)
-      return { success: false, error: 'Cannot connect to server.' }
-    }
+  async function loadTrending() {
+  loading.value = true
+  error.value   = ''
+  try {
+    movies.value = await fetchTrending()
+  } catch (e) {
+    error.value = 'Failed to load trending titles.'
+    console.error('loadTrending error:', e)
+  } finally {
+    loading.value = false
   }
+  }
+
+  async function loadPopular(type = 'all', page = 1) {
+  loading.value = true
+  error.value   = ''
+  try {
+    if (type === 'movie') {
+      const data   = await fetchPopularMovies(page)
+      movies.value = data.results
+      return data.totalPages
+    } else if (type === 'tv') {
+      const data   = await fetchPopularTV(page)
+      movies.value = data.results
+      return data.totalPages
+    } else {
+      const [mv, tv] = await Promise.all([
+        fetchPopularMovies(page),
+        fetchPopularTV(page),
+      ])
+      movies.value = [...mv.results, ...tv.results].sort((a, b) => b.rating - a.rating)
+      return Math.max(mv.totalPages, tv.totalPages)
+    }
+  } catch (e) {
+    error.value = 'Failed to load titles.'
+    console.error('loadPopular error:', e)
+    return 0
+  } finally {
+    loading.value = false
+  }
+}
+
+  async function search(query = '', filters = {}, page = 1) {
+  loading.value = true
+  error.value   = ''
+  try {
+    const data = query.trim()
+      ? await searchTMDB(query, page)
+      : await discoverMedia(filters, page)
+    movies.value = data.results
+    return data.totalPages
+  } catch (e) {
+    error.value = 'Search failed. Please try again.'
+    console.error('search error:', e)
+    return 0
+  } finally {
+    loading.value = false
+  }
+  }
+
+async function loadDetail(id, type = 'movie') {
+  const cacheKey = `${type}-${id}`
+  if (detailCache.value[cacheKey]) return detailCache.value[cacheKey]
+
+  loading.value = true
+  error.value   = ''
+  try {
+    const detail = await fetchDetail(id, type)
+    detailCache.value[cacheKey] = detail
+    return detail
+  } catch (e) {
+    error.value = 'Failed to load title details.'
+    console.error('loadDetail error:', e)
+    return null
+  } finally {
+    loading.value = false
+  }
+}
 
   // ── Movie helpers 
   function getMovieById(id) {
-    return movies.value.find(m => m.id === Number(id))
-  }
-
+  // Check detail cache first — has full cast, director, duration
+  const fromCache = Object.values(detailCache.value).find(d => d.id === Number(id))
+  if (fromCache) return fromCache
+  // Fall back to movies array (basic info only)
+  return movies.value.find(m => m.id === Number(id))
+}
   function searchMedia(query, filters = {}) {
     return movies.value.filter(m => {
       const matchQuery  = !query             || m.title.toLowerCase().includes(query.toLowerCase())
@@ -259,12 +329,32 @@ export const useMediaStore = defineStore('media', () => {
   }
 
   return {
-    movies, reviews, watchlist, likedMedia, trending,
-    fetchMedia, getMovieById, searchMedia,
-    fetchReviewsByMediaId, fetchReviewsByUserId,
-    getReviewsByMediaId, getReviewsByUserId,
-    addReview, updateReview, deleteReview, toggleReviewLike,
-    fetchWatchlist, isInWatchlist, toggleWatchlist, getWatchlistMovies,
-    isLiked, toggleLike,
+    movies, 
+    reviews, 
+    watchlist, 
+    likedMedia, 
+    trending, 
+    loading,
+    error,
+    loadTrending,
+    loadPopular,
+    search,
+    loadDetail,
+    getMovieById, 
+    searchMedia,
+    fetchReviewsByMediaId, 
+    fetchReviewsByUserId,
+    getReviewsByMediaId, 
+    getReviewsByUserId,
+    addReview, 
+    updateReview, 
+    deleteReview, 
+    toggleReviewLike,
+    fetchWatchlist, 
+    isInWatchlist, 
+    toggleWatchlist, 
+    getWatchlistMovies,
+    isLiked, 
+    toggleLike,
   }
 })
