@@ -1,111 +1,169 @@
 <template>
-  <div class="trending-page">
+  <div class="trending-page bg-black text-light">
 
-    <!-- Hero Section -->
-    <section class="trending-hero py-5 position-relative text-light">
+    <!-- HERO -->
+    <section class="trending-hero position-relative overflow-hidden">
+
+      <!-- BACKGROUND -->
       <img
         src="https://images.unsplash.com/photo-1524985069026-dd778a71c7b4?auto=format&fit=crop&w=1400&q=80"
-        alt="Trending Hero"
-        class="w-100 hero-img position-absolute top-0 start-0"
+        alt="Cinema Background"
+        class="hero-img position-absolute top-0 start-0 w-100 h-100"
       />
-      <div class="hero-gradient position-absolute top-0 start-0 w-100 h-100"></div>
 
-      <div class="container position-relative text-center py-5">
-        <p class="eyebrow text-warning mb-2">Popularity</p>
-        <h1 class="display-4 fw-bold mb-3">Most Popular Movies</h1>
-        <p class="hero-description text-light mx-auto" style="max-width: 720px;">
+      <!-- OVERLAY -->
+      <div class="hero-overlay position-absolute top-0 start-0 w-100 h-100"></div>
+
+      <!-- CONTENT -->
+      <div class="container position-relative z-2 py-5 text-center">
+
+        <div class="hero-line mx-auto mb-5"></div>
+
+        <p class="text-warning fs-4 mb-3 fw-semibold">
+          Popularity
+        </p>
+
+        <h1 class="display-1 fw-bold mb-4">
+          Most Popular Movies
+        </h1>
+
+        <p class="lead text-light opacity-75 mx-auto mb-5 hero-description">
           Explore the most popular movies that people are talking about.
         </p>
-      </div>
 
-      <!-- Sort Panel -->
-      <div class="container mt-4">
-        <div class="d-flex justify-content-end gap-3 sort-panel mx-auto p-3 rounded">
+        <!-- SORT PANEL -->
+        <div
+          class="sort-panel d-inline-flex align-items-center gap-3 p-3 rounded-4"
+        >
 
-          <span class="sort-label text-light fw-semibold">Sort by</span>
+          <span class="fw-bold fs-5">
+            Sort by
+          </span>
 
-          <div class="sort-select position-relative">
-            <select v-model="sortBy" class="form-select sort-dropdown text-light border-secondary">
-              <option value="rating">IMDb rating</option>
-              <option value="reviewCount">Review count</option>
+          <!-- SELECT -->
+          <div class="position-relative">
+
+            <select
+              v-model="sortBy"
+              class="form-select sort-dropdown"
+            >
+              <option value="rating">
+                IMDb rating
+              </option>
+
+              <option value="reviewCount">
+                Review count
+              </option>
             </select>
-            <span class="select-arrow">▾</span>
+
           </div>
 
+          <!-- TOGGLE -->
           <button
-            type="button"
-            class="sort-toggle"
+            class="btn sort-toggle"
             @click="toggleSortOrder"
           >
-            <span class="direction-arrow">
-              {{ sortOrder === 'desc' ? '⇩' : '⇧' }}
-            </span>
+            {{ sortOrder === 'desc' ? '⇩' : '⇧' }}
           </button>
 
         </div>
+
       </div>
     </section>
 
-    <!-- Ranked List -->
-    <section class="ranked-section py-5">
+    <!-- MOVIES -->
+    <section class="py-5">
+
       <div class="container">
 
-        <div class="ranked-list d-flex flex-column gap-4">
+        <div class="d-flex flex-column gap-4">
 
           <div
-            v-for="(media, index) in normalizedMovies"
+            v-for="(media, index) in sortedMovies"
             :key="media.id"
-            class="ranked-item position-relative"
+            class="movie-card card bg-dark border-secondary text-light shadow-lg position-relative overflow-hidden"
           >
 
+            <!-- RANK -->
             <div class="rank-badge">
               {{ index + 1 }}
             </div>
 
-            <div class="rank-card d-flex flex-column flex-md-row gap-3 p-3 rounded bg-dark border border-secondary">
+            <div class="row g-0">
 
-              <img :src="media.poster" :alt="media.title" class="rank-poster rounded" />
+              <!-- POSTER -->
+              <div class="col-md-3">
 
-              <div class="rank-data d-flex flex-column gap-2 flex-grow-1">
-
-                <div class="rank-header d-flex justify-content-between align-items-center">
-                  <h2 class="h5 mb-1 text-light">{{ media.title }}</h2>
-
-                  <span class="badge bg-warning text-dark">
-                    {{ media.type === 'tv' ? 'TV' : 'Film' }}
-                  </span>
-                </div>
-
-                <p class="media-subtitle text-muted mb-1">
-                  {{ media.year }} · {{ (media.genre || []).join(', ') }}
-                </p>
-
-                <p class="media-synopsis text-light mb-2">
-                  {{ media.synopsis }}
-                </p>
-
-                <div class="rank-stats d-flex gap-2 flex-wrap mb-2">
-                  <span class="stat badge bg-secondary text-warning">
-                    ★ {{ (media.rating || 0).toFixed(1) }}
-                  </span>
-
-                  <span class="stat badge bg-secondary text-light">
-                    ✍ {{ media.reviewCount || 0 }} reviews
-                  </span>
-                </div>
-
-                <RouterLink
-                  :to="{
-                    name: 'MediaDetail',
-                    params: { id: media.id },
-                    query: { type: media.type }
-                  }"
-                  class="btn btn-outline-warning btn-sm w-auto"
-                >
-                  View details
-                </RouterLink>
+                <img
+                  :src="media.poster"
+                  :alt="media.title"
+                  class="img-fluid h-100 object-fit-cover movie-poster"
+                />
 
               </div>
+
+              <!-- CONTENT -->
+              <div class="col-md-9">
+
+                <div class="card-body p-4 d-flex flex-column h-100">
+
+                  <!-- HEADER -->
+                  <div
+                    class="d-flex justify-content-between align-items-start mb-3"
+                  >
+
+                    <div>
+
+                      <h2 class="h3 fw-bold mb-2">
+                        {{ media.title }}
+                      </h2>
+
+                      <p class="text-secondary mb-0">
+                        {{ media.year }} ·
+                        {{ (media.genre || []).join(', ') }}
+                      </p>
+
+                    </div>
+
+                    <span class="badge bg-warning text-dark px-3 py-2">
+                      {{ media.type === 'tv' ? 'TV' : 'Film' }}
+                    </span>
+
+                  </div>
+
+                  <!-- SYNOPSIS -->
+                  <p class="flex-grow-1 movie-synopsis">
+                    {{ media.synopsis }}
+                  </p>
+
+                  <!-- STATS -->
+                  <div class="d-flex flex-wrap gap-2 mb-4">
+
+                    <span class="badge bg-secondary px-3 py-2 fs-6">
+                      ★ {{ (media.rating || 0).toFixed(1) }}
+                    </span>
+
+                    <span class="badge bg-secondary px-3 py-2 fs-6">
+                      ✍ {{ media.reviewCount || 0 }} reviews
+                    </span>
+
+                  </div>
+
+                  <!-- BUTTON -->
+                  <RouterLink
+                    :to="{
+                      name: 'MediaDetail',
+                      params: { id: media.id },
+                      query: { type: media.type }
+                    }"
+                    class="btn btn-outline-warning align-self-start"
+                  >
+                    View details
+                  </RouterLink>
+
+                </div>
+              </div>
+
             </div>
           </div>
 
@@ -118,20 +176,35 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import {
+  ref,
+  computed,
+  watch,
+  onMounted
+} from 'vue'
+
 import { useMediaStore } from '../stores/media'
 
 const mediaStore = useMediaStore()
 
 const sortBy = ref('rating')
 const sortOrder = ref('desc')
+
 const activeTab = ref('all')
 const currentPage = ref(1)
 const totalPages = ref(1)
 
+/* LOAD */
 async function load() {
-  const pages = await mediaStore.loadPopular(activeTab.value, currentPage.value)
-  if (pages) totalPages.value = pages
+
+  const pages = await mediaStore.loadPopular(
+    activeTab.value,
+    currentPage.value
+  )
+
+  if (pages) {
+    totalPages.value = pages
+  }
 }
 
 onMounted(() => {
@@ -147,30 +220,261 @@ watch(currentPage, () => {
   load()
 })
 
-/**
- * 🔥 FIX: normalize type everywhere
- */
+/* NORMALIZE */
 const normalizedMovies = computed(() => {
+
   return (mediaStore.movies || []).map(m => ({
     ...m,
-    type: m.type || m.media_type || 'movie'
+
+    type:
+      m.type ||
+      m.media_type ||
+      'movie',
+
+    rating:
+      m.rating ||
+      m.vote_average ||
+      0,
+
+    reviewCount:
+      m.reviewCount ||
+      m.vote_count ||
+      0
   }))
 })
 
+/* SORT */
 const sortedMovies = computed(() => {
+
   const list = [...normalizedMovies.value]
 
-  const order = sortOrder.value === 'asc' ? 1 : -1
+  const order =
+    sortOrder.value === 'asc'
+      ? 1
+      : -1
 
   return list.sort((a, b) => {
+
     if (sortBy.value === 'reviewCount') {
-      return order * ((a.reviewCount || 0) - (b.reviewCount || 0))
+
+      return order * (
+        (a.reviewCount || 0) -
+        (b.reviewCount || 0)
+      )
     }
-    return order * ((a.rating || 0) - (b.rating || 0))
+
+    return order * (
+      (a.rating || 0) -
+      (b.rating || 0)
+    )
   })
 })
 
+/* TOGGLE */
 function toggleSortOrder() {
-  sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
+
+  sortOrder.value =
+    sortOrder.value === 'desc'
+      ? 'asc'
+      : 'desc'
 }
 </script>
+
+<style scoped>
+
+/* HERO */
+
+.trending-hero {
+  min-height: 650px;
+  display: flex;
+  align-items: center;
+}
+
+.hero-img {
+  object-fit: cover;
+}
+
+.hero-overlay {
+  background:
+    linear-gradient(
+      to bottom,
+      rgba(0,0,0,0.65),
+      rgba(0,0,0,0.92)
+    );
+}
+
+.hero-line {
+  width: 120px;
+  height: 5px;
+
+  background: #22b8ff;
+
+  border-radius: 999px;
+}
+
+.hero-description {
+  max-width: 700px;
+}
+
+/* SORT PANEL */
+
+.sort-panel {
+
+  background:
+    rgba(15,15,15,0.7);
+
+  backdrop-filter: blur(12px);
+
+  border:
+    1px solid rgba(255,255,255,0.08);
+}
+
+/* DROPDOWN */
+
+.sort-dropdown {
+
+  width: 220px;
+
+  background:
+    rgba(20,20,20,0.95) !important;
+
+  color: white !important;
+
+  border:
+    1px solid rgba(255,255,255,0.12);
+
+  border-radius: 12px;
+
+  padding:
+    0.75rem 2.5rem 0.75rem 1rem;
+
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.sort-dropdown:focus {
+
+  border-color: #ffc107;
+
+  box-shadow:
+    0 0 0 0.2rem rgba(255,193,7,0.2);
+}
+
+/* OPTION FIX */
+
+.sort-dropdown option {
+  background: #1b1b1b;
+  color: white;
+}
+
+/* TOGGLE BUTTON */
+
+.sort-toggle {
+
+  background:
+    rgba(20,20,20,0.95);
+
+  border:
+    1px solid rgba(255,255,255,0.12);
+
+  color: #ffc107;
+
+  width: 52px;
+  height: 52px;
+
+  border-radius: 12px;
+
+  font-size: 1.2rem;
+}
+
+.sort-toggle:hover {
+
+  border-color: #ffc107;
+  color: #ffc107;
+}
+
+/* MOVIE CARD */
+
+.movie-card {
+
+  border-radius: 24px;
+
+  transition:
+    transform 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.movie-card:hover {
+
+  transform: translateY(-4px);
+
+  border-color:
+    rgba(255,193,7,0.5) !important;
+}
+
+/* RANK BADGE */
+
+.rank-badge {
+
+  position: absolute;
+
+  top: 16px;
+  left: 16px;
+
+  width: 42px;
+  height: 42px;
+
+  border-radius: 50%;
+
+  background: #ffc107;
+  color: black;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-weight: 800;
+
+  z-index: 3;
+}
+
+/* POSTER */
+
+.movie-poster {
+
+  min-height: 100%;
+  object-fit: cover;
+}
+
+/* SYNOPSIS */
+
+.movie-synopsis {
+
+  line-height: 1.7;
+
+  color:
+    rgba(255,255,255,0.82);
+}
+
+/* MOBILE */
+
+@media (max-width: 768px) {
+
+  .sort-panel {
+
+    width: 100%;
+
+    flex-direction: column;
+  }
+
+  .sort-dropdown {
+    width: 100%;
+  }
+
+  .movie-poster {
+    max-height: 420px;
+  }
+}
+
+</style>
