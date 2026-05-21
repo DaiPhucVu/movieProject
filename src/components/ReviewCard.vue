@@ -2,7 +2,7 @@
   <div class="review-card">
     <div class="review-header">
       <RouterLink :to="`/profile/${review.user.username}`" class="reviewer">
-        <img :src="review.user.avatar" :alt="review.user.displayName" class="reviewer-avatar" />
+        <img :src="avatarUrl(review.user, 80)" :alt="review.user.displayName" class="reviewer-avatar" />
         <div>
           <p class="reviewer-name">{{ review.user.displayName }}</p>
           <p class="review-date">{{ formatDate(review.createdAt) }}</p>
@@ -30,6 +30,7 @@
 import { computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useMediaStore } from '../stores/media'
+import { avatarUrl } from '../utils/avatar'
 
 const props = defineProps({ review: { type: Object, required: true } })
 defineEmits(['delete'])
