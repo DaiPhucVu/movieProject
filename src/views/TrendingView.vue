@@ -19,12 +19,12 @@
 
         <div class="hero-line mx-auto mb-5"></div>
 
-        <p class="text-warning fs-4 mb-3 fw-semibold">
+        <p class="cl-accent fs-4 mb-3 fw-semibold">
           Popularity
         </p>
 
-        <h1 class="display-1 fw-bold mb-4">
-          Most Popular Movies
+        <h1 class="cl-display display-title mb-4">
+          Most Popular <span class="cl-accent">Movies</span>
         </h1>
 
         <p class="lead text-light opacity-75 mx-auto mb-5 hero-description">
@@ -306,14 +306,18 @@ function toggleSortOrder() {
 .hero-line {
   width: 120px;
   height: 5px;
-
-  background: #22b8ff;
-
+  background: var(--cl-accent);
   border-radius: 999px;
 }
 
 .hero-description {
   max-width: 700px;
+}
+
+/* TITLE */
+
+.display-title {
+  font-size: clamp(2.5rem, 6vw, 4.5rem);
 }
 
 /* SORT PANEL */
@@ -355,10 +359,10 @@ function toggleSortOrder() {
 
 .sort-dropdown:focus {
 
-  border-color: #ffc107;
+  border-color: var(--cl-accent);
 
   box-shadow:
-    0 0 0 0.2rem rgba(255,193,7,0.2);
+    0 0 0 0.2rem rgba(232,197,71,0.2);
 }
 
 /* OPTION FIX */
@@ -378,7 +382,7 @@ function toggleSortOrder() {
   border:
     1px solid rgba(255,255,255,0.12);
 
-  color: #ffc107;
+  color: var(--cl-accent);
 
   width: 52px;
   height: 52px;
@@ -390,8 +394,8 @@ function toggleSortOrder() {
 
 .sort-toggle:hover {
 
-  border-color: #ffc107;
-  color: #ffc107;
+  border-color: var(--cl-accent);
+  color: var(--cl-accent);
 }
 
 /* MOVIE CARD */
@@ -410,7 +414,7 @@ function toggleSortOrder() {
   transform: translateY(-4px);
 
   border-color:
-    rgba(255,193,7,0.5) !important;
+    rgba(232,197,71,0.5) !important;
 }
 
 /* RANK BADGE */
@@ -427,8 +431,8 @@ function toggleSortOrder() {
 
   border-radius: 50%;
 
-  background: #ffc107;
-  color: black;
+  background: var(--cl-accent);
+  color: var(--cl-bg);
 
   display: flex;
   align-items: center;
