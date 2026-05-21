@@ -1,7 +1,7 @@
 <template>
   <div class="search-page">
     <div class="container">
-      <h1 class="page-title">Search <span>Films & Series</span></h1>
+      <h1 class="cl-display page-title">Search <span class="cl-accent">Films & Series</span></h1>
 
       <!-- Search Bar -->
       <div class="search-bar">
@@ -91,40 +91,39 @@ function resetFilters() {
 
 <style scoped>
 .search-page { padding: 48px 0 80px; }
-.page-title { font-family: var(--font-display); font-size: clamp(2rem, 5vw, 3.5rem); letter-spacing: 0.04em; margin-bottom: 28px; }
-.page-title span { color: var(--accent); }
+.page-title { font-size: clamp(2rem, 5vw, 3.5rem); letter-spacing: 0.04em; margin-bottom: 28px; }
 
 .search-bar { margin-bottom: 20px; }
 .search-input {
   width: 100%;
-  background: var(--card);
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
+  background: var(--cl-surface);
+  border: 1.5px solid var(--cl-border);
+  border-radius: var(--cl-radius);
+  color: var(--cl-text);
   font-size: 1rem;
   padding: 14px 18px;
   outline: none;
   transition: border-color 0.2s;
 }
-.search-input:focus { border-color: var(--accent); }
-.search-input::placeholder { color: var(--text-dim); }
+.search-input:focus { border-color: var(--cl-accent); }
+.search-input::placeholder { color: var(--cl-text-dim); }
 
 .filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
 .filter-select {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
+  background: var(--cl-surface);
+  border: 1px solid var(--cl-border);
+  border-radius: var(--cl-radius);
+  color: var(--cl-text);
   font-size: 0.88rem;
   padding: 8px 12px;
   outline: none;
   cursor: pointer;
 }
-.filter-select:focus { border-color: var(--accent); }
+.filter-select:focus { border-color: var(--cl-accent); }
 .year-input { width: 100px; }
 
-.results-meta { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 20px; }
-.results-meta.dim { color: var(--text-dim); }
+.results-meta { font-size: 0.85rem; color: var(--cl-text-muted); margin-bottom: 20px; }
+.results-meta.dim { color: var(--cl-text-dim); }
 
 .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; }
 </style>
