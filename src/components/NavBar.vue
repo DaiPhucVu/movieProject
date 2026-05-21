@@ -33,7 +33,7 @@
         <div class="d-flex align-items-center gap-2">
           <template v-if="auth.isAuthenticated">
             <RouterLink :to="`/profile/${auth.user.username}`" class="d-flex align-items-center gap-2 text-decoration-none text-light">
-              <img :src="auth.user.avatar" :alt="auth.user.displayName" class="rounded-circle" style="width:32px; height:32px; object-fit:cover; border:2px solid #ffc107;" />
+              <img :src="avatarUrl(auth.user, 64)" :alt="auth.user.displayName" class="rounded-circle" style="width:32px; height:32px; object-fit:cover; border:2px solid #ffc107;" />
               <span>{{ auth.user.displayName }}</span>
             </RouterLink>
             <button class="btn btn-outline-warning btn-sm" @click="handleLogout">Sign out</button>
@@ -52,6 +52,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { avatarUrl } from '../utils/avatar'
 
 const auth = useAuthStore()
 const router = useRouter()
