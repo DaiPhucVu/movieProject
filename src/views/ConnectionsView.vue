@@ -22,14 +22,17 @@
           </p>
         </div>
 
-        <!-- Search -->
+        <!-- Search: filters this tab AND searches all platform users -->
         <div class="search-wrap">
           <input
             v-model="search"
             type="text"
             class="form-control bg-dark text-light border-secondary"
-            placeholder="Filter by name or @handle…"
+            placeholder="Search any user by name or @handle…"
           />
+          <p class="cl-dim small mt-1 mb-0">
+            Searches followers, following, and everyone on CineLog.
+          </p>
         </div>
       </header>
 
@@ -85,59 +88,74 @@
         </p>
       </div>
 
-      <!-- User cards grid -->
+      <!-- User cards grid (current tab) -->
       <div v-else class="row g-3">
         <div
           v-for="u in filteredUsers"
           :key="u.id"
           class="col-12 col-md-6 col-lg-4"
         >
-          <div class="user-card cl-card p-3 d-flex align-items-center gap-3">
-            <RouterLink :to="`/profile/${u.username}`" class="flex-shrink-0">
-              <img
-                :src="avatarUrl(u, 96)"
-                :alt="u.displayName"
-                class="user-avatar"
-              />
-            </RouterLink>
-
-            <div class="flex-grow-1 min-w-0">
-              <RouterLink
-                :to="`/profile/${u.username}`"
-                class="user-name text-decoration-none d-block"
-              >{{ u.displayName }}</RouterLink>
-              <p class="cl-dim small mb-1">@{{ u.username }}</p>
-              <p v-if="u.bio" class="user-bio cl-muted small mb-0">{{ u.bio }}</p>
-            </div>
-
-            <!-- Follow toggle (only when viewer is signed in and not themself) -->
-            <button
-              v-if="auth.isAuthenticated && u.id !== auth.user?.id"
-              type="button"
-              class="cl-btn cl-btn-sm flex-shrink-0"
-              :class="u.isFollowing ? 'cl-btn-ghost' : 'cl-btn-primary'"
-              :disabled="pendingId === u.id"
-              @click="toggleFollow(u)"
-            >
-              <span v-if="pendingId === u.id">…</span>
-              <span v-else>{{ u.isFollowing ? '✓ Following' : '+ Follow' }}</span>
-            </button>
-            <span
-              v-else-if="auth.isAuthenticated && u.id === auth.user?.id"
-              class="cl-badge cl-badge-accent flex-shrink-0"
-            >You</span>
-          </div>
+          <UserCard
+            :user="u"
+            :pending="pendingId === u.id"
+            :is-self="auth.isAuthenticated && u.id === auth.user?.id"
+            :can-follow="auth.isAuthenticated"
+            @toggle="toggleFollow"
+          />
         </div>
       </div>
+
+      <!-- Platform-wide search results -->
+      <section v-if="trimmedSearch" class="discover-section mt-5 pt-4 cl-border-t">
+        <div class="d-flex justify-content-between align-items-end flex-wrap gap-2 mb-3">
+          <div>
+            <h2 class="cl-display section-title mb-1">
+              Discover <span class="cl-accent">other users</span>
+            </h2>
+            <p class="cl-muted small mb-0">
+              People on CineLog matching "{{ trimmedSearch }}"
+            </p>
+          </div>
+        </div>
+
+        <div v-if="globalLoading" class="text-center py-4 cl-muted">
+          <p class="mb-0">Searching…</p>
+        </div>
+
+        <div
+          v-else-if="discoverUsers.length === 0"
+          class="cl-card empty-state-sm p-4 text-center mx-auto"
+        >
+          <p class="cl-muted mb-0">
+            No other users match "{{ trimmedSearch }}".
+          </p>
+        </div>
+
+        <div v-else class="row g-3">
+          <div
+            v-for="u in discoverUsers"
+            :key="u.id"
+            class="col-12 col-md-6 col-lg-4"
+          >
+            <UserCard
+              :user="u"
+              :pending="pendingId === u.id"
+              :is-self="auth.isAuthenticated && u.id === auth.user?.id"
+              :can-follow="auth.isAuthenticated"
+              @toggle="toggleFollow"
+            />
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { avatarUrl } from '../utils/avatar'
+import UserCard from '../components/UserCard.vue'
 
 const API = 'http://localhost:3000/api'
 
@@ -152,22 +170,36 @@ const loading   = ref(true)
 const pendingId = ref(null) // user id whose follow toggle is in-flight
 const search    = ref('')
 
+// Global search across all platform users (Discover section)
+const globalResults = ref([])
+const globalLoading = ref(false)
+
 // `activeTab` mirrors the `?tab=` query string so deep links work and
 // users can switch tabs by URL too.
 const activeTab = ref(route.query.tab === 'following' ? 'following' : 'followers')
 
 // ── Computed ────────────────────────────────────────────────────────
+const trimmedSearch = computed(() => search.value.trim())
+
 const usersForTab = computed(() =>
   activeTab.value === 'followers' ? followers.value : following.value
 )
 
 const filteredUsers = computed(() => {
-  if (!search.value.trim()) return usersForTab.value
-  const q = search.value.toLowerCase()
+  if (!trimmedSearch.value) return usersForTab.value
+  const q = trimmedSearch.value.toLowerCase()
   return usersForTab.value.filter(u =>
     u.displayName.toLowerCase().includes(q) ||
     u.username.toLowerCase().includes(q)
   )
+})
+
+// "Discover" only shows users not already in the current tab so the page
+// doesn't duplicate cards above and below the divider.
+const discoverUsers = computed(() => {
+  if (!trimmedSearch.value) return []
+  const visibleIds = new Set(filteredUsers.value.map(u => u.id))
+  return globalResults.value.filter(u => !visibleIds.has(u.id))
 })
 
 // ── Data loading ────────────────────────────────────────────────────
@@ -200,6 +232,54 @@ async function loadConnections() {
     loading.value = false
   }
 }
+
+// Platform-wide user search.
+// Debounced so we don't fire a request on every keystroke. Cancellable via
+// the `requestId` token so a slow earlier response can't overwrite a faster
+// later one.
+let searchTimer = null
+let requestId   = 0
+
+function runGlobalSearch(q) {
+  const myId = ++requestId
+  globalLoading.value = true
+
+  const url = `${API}/users?q=${encodeURIComponent(q)}&limit=12`
+  const headers = auth.token ? { Authorization: `Bearer ${auth.token}` } : {}
+
+  fetch(url, { headers })
+    .then(res => res.ok ? res.json() : { users: [] })
+    .then(data => {
+      if (myId !== requestId) return // a newer search has superseded us
+      globalResults.value = data.users || []
+    })
+    .catch(err => {
+      console.error('User search failed:', err)
+      if (myId === requestId) globalResults.value = []
+    })
+    .finally(() => {
+      if (myId === requestId) globalLoading.value = false
+    })
+}
+
+watch(trimmedSearch, (q) => {
+  if (searchTimer) clearTimeout(searchTimer)
+
+  if (!q) {
+    // Empty box → drop any in-flight result; nothing to show in Discover.
+    requestId++
+    globalResults.value = []
+    globalLoading.value = false
+    return
+  }
+
+  // 250ms debounce feels responsive without spamming the backend.
+  searchTimer = setTimeout(() => runGlobalSearch(q), 250)
+})
+
+onUnmounted(() => {
+  if (searchTimer) clearTimeout(searchTimer)
+})
 
 // ── Actions ─────────────────────────────────────────────────────────
 function setTab(name) {
@@ -237,7 +317,9 @@ async function toggleFollow(user) {
 }
 
 function updateUserEverywhere(userId, patch) {
-  for (const list of [followers.value, following.value]) {
+  // Also update the Discover list so a user followed from there flips state
+  // without needing a refetch.
+  for (const list of [followers.value, following.value, globalResults.value]) {
     const found = list.find(u => u.id === userId)
     if (found) Object.assign(found, patch)
   }
@@ -270,7 +352,13 @@ watch(() => route.query.tab, (newTab) => {
 .back-link { transition: color var(--cl-transition); }
 .back-link:hover { color: var(--cl-accent) !important; }
 
-.search-wrap { width: 100%; max-width: 280px; }
+.search-wrap { width: 100%; max-width: 320px; }
+.section-title {
+  font-size: clamp(1.3rem, 3vw, 1.8rem);
+  letter-spacing: 0.04em;
+  color: var(--cl-text);
+}
+.discover-section { /* spacing handled by utility classes on the element */ }
 
 /* -- Filter pills (matches WatchlistView/ProfileView) -- */
 .filter-tabs {
@@ -312,42 +400,20 @@ watch(() => route.query.tab, (newTab) => {
   color: var(--cl-bg);
 }
 
-/* -- User cards -- */
-.user-card {
-  transition: border-color var(--cl-transition), transform var(--cl-transition);
-}
-.user-card:hover {
-  border-color: var(--cl-border-hover);
-  transform: translateY(-2px);
-}
-.user-avatar {
-  width: 56px; height: 56px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid var(--cl-border);
-}
-.user-name {
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: var(--cl-text);
-}
-.user-name:hover { color: var(--cl-accent); }
-.user-bio {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.min-w-0 { min-width: 0; }
+/* User card styles live in UserCard.vue (scoped to that component). */
 
-/* -- Empty state -- */
+/* -- Empty states -- */
 .empty-state {
   border-style: dashed;
   max-width: 560px;
+}
+.empty-state-sm {
+  border-style: dashed;
+  max-width: 480px;
 }
 .empty-icon { font-size: 3rem; opacity: 0.6; }
 
 @media (max-width: 575.98px) {
   .filter-tab { padding: 6px 12px; font-size: 0.8rem; }
-  .user-avatar { width: 48px; height: 48px; }
 }
 </style>
