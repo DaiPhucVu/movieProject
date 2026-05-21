@@ -241,6 +241,39 @@ app.post('/api/watchlist/toggle', authenticate, async (req, res) => {
 })
 
 // ── Users / Profiles ───────────────────────────────────────────────
+// Platform-wide user search.
+// Used by ConnectionsView's "Discover other users" section so signed-in
+// users can find accounts they don't already follow. The viewer (if any)
+// is excluded from results, and `isFollowing` is decorated per row so the
+// UI can render the right action button.
+app.get('/api/users', attachUser, async (req, res) => {
+  const q = String(req.query.q || '').trim()
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 50)
+
+  if (!q) return res.json({ users: [] })
+
+  // SQLite's LIKE is case-insensitive for ASCII by default, which is fine
+  // for usernames and English display names. Prisma's `contains` translates
+  // to a LIKE filter under the hood.
+  const rows = await prisma.user.findMany({
+    where: {
+      AND: [
+        req.userId ? { id: { not: req.userId } } : {},
+        {
+          OR: [
+            { username:    { contains: q } },
+            { displayName: { contains: q } },
+          ],
+        },
+      ],
+    },
+    take:    limit,
+    orderBy: { username: 'asc' },
+  })
+
+  res.json({ users: await decorateFollows(rows, req.userId) })
+})
+
 // Public profile lookup by username.
 // When called with a Bearer token, the response also includes `isFollowing`
 // and `isSelf` flags so the frontend can render the right action button.
