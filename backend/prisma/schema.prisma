@@ -13,8 +13,28 @@ model User {
   displayName String
   email       String     @unique
   password    String
+  avatar      String?
+  bio         String?
   createdAt   DateTime   @default(now())
   reviews     Review[]
+
+  // Social: people I follow / people who follow me
+  following   Follow[]   @relation("UserFollowing")
+  followers   Follow[]   @relation("UserFollowers")
+}
+
+// Directed follow edge: followerId -> followingId
+// One row means "follower follows following".
+model Follow {
+  id          Int      @id @default(autoincrement())
+  follower    User     @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  followerId  Int
+  following   User     @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+  followingId Int
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followingId])
 }
 
 // Media model kept for reference / future use, but no longer
