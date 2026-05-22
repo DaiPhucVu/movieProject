@@ -6,6 +6,11 @@
 //   npx prisma db seed
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import dotenv from 'dotenv'
+import { dirname, join } from 'path'
+import { fileURLToPath } from 'url'
+
+dotenv.config({ path: join(dirname(fileURLToPath(import.meta.url)), '../.env') })
 
 const prisma = new PrismaClient()
 
