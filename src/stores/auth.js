@@ -90,5 +90,35 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('cinelog_token')
   }
 
-  return { user, token, isAuthenticated, authHeader, login, register, logout }
+  // updateProfile() — let the signed-in user change their displayName /
+  // avatar / bio. Persists to backend, then mirrors the new fields onto
+  // local state + localStorage so NavBar etc. update without a refresh.
+  async function updateProfile(patch) {
+    if (!token.value) return { success: false, error: 'Not signed in' }
+
+    try {
+      const response = await fetch(`${API}/users/me`, {
+        method:  'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization:  `Bearer ${token.value}`,
+        },
+        body: JSON.stringify(patch),
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Could not update profile' }
+      }
+
+      user.value = { ...user.value, ...data.user }
+      localStorage.setItem('cinelog_user', JSON.stringify(user.value))
+      return { success: true, user: data.user }
+
+    } catch (err) {
+      return { success: false, error: 'Cannot connect to server.' }
+    }
+  }
+
+  return { user, token, isAuthenticated, authHeader, login, register, logout, updateProfile }
 })
