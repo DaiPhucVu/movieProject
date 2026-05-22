@@ -15,6 +15,7 @@ model User {
   password    String
   avatar      String?
   bio         String?
+  isPrivate   Boolean    @default(false)
   createdAt   DateTime   @default(now())
   reviews     Review[]
 
