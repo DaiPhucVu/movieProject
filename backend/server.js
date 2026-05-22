@@ -62,7 +62,18 @@ function publicUser(u) {
     displayName: u.displayName,
     avatar:      u.avatar || null,
     bio:         u.bio    || null,
+    isPrivate:   !!u.isPrivate,
   }
+}
+
+// Private profiles hide reviews, watchlist, and connections from other users.
+function canViewProfileContent(profileUser, viewerId) {
+  if (!profileUser.isPrivate) return true
+  return viewerId === profileUser.id
+}
+
+async function findUserByUsername(username) {
+  return prisma.user.findUnique({ where: { username } })
 }
 
 // Accept https URLs or data:image/* base64 from the device upload flow.
@@ -104,6 +115,7 @@ app.post('/api/auth/register', async (req, res) => {
         email:       user.email,
         avatar:      user.avatar || null,
         bio:         user.bio    || null,
+        isPrivate:   !!user.isPrivate,
       },
       token,
     })
@@ -136,6 +148,7 @@ app.post('/api/auth/login', async (req, res) => {
       email:       user.email,
       avatar:      user.avatar || null,
       bio:         user.bio    || null,
+      isPrivate:   !!user.isPrivate,
     },
     token,
   })
@@ -292,58 +305,54 @@ app.get('/api/users', attachUser, async (req, res) => {
 // When called with a Bearer token, the response also includes `isFollowing`
 // and `isSelf` flags so the frontend can render the right action button.
 app.get('/api/users/:username', attachUser, async (req, res) => {
-  const user = await prisma.user.findUnique({
-    where: { username: req.params.username },
-  })
+  const user = await findUserByUsername(req.params.username)
   if (!user) return res.status(404).json({ error: 'User not found' })
 
-  // Aggregated counts displayed on the profile header
-  const [reviewCount, watchlistCount, followersCount, followingCount] = await Promise.all([
-    prisma.review.count({ where: { userId: user.id } }),
-    prisma.watchlist.count({ where: { userId: user.id } }),
-    prisma.follow.count({ where: { followingId: user.id } }),
-    prisma.follow.count({ where: { followerId: user.id } }),
-  ])
+  const isSelf = req.userId === user.id
+  const canViewContent = canViewProfileContent(user, req.userId)
 
-  // Only check the follow edge if the viewer is signed in and looking at
-  // someone else's profile.
+  let stats = { reviews: 0, watchlist: 0, followers: 0, following: 0 }
+  if (canViewContent) {
+    const [reviewCount, watchlistCount, followersCount, followingCount] = await Promise.all([
+      prisma.review.count({ where: { userId: user.id } }),
+      prisma.watchlist.count({ where: { userId: user.id } }),
+      prisma.follow.count({ where: { followingId: user.id } }),
+      prisma.follow.count({ where: { followerId: user.id } }),
+    ])
+    stats = { reviews: reviewCount, watchlist: watchlistCount, followers: followersCount, following: followingCount }
+  }
+
   let isFollowing = false
-  let isSelf      = false
-  if (req.userId) {
-    isSelf = req.userId === user.id
-    if (!isSelf) {
-      const edge = await prisma.follow.findUnique({
-        where: {
-          followerId_followingId: {
-            followerId:  req.userId,
-            followingId: user.id,
-          },
+  if (req.userId && !isSelf) {
+    const edge = await prisma.follow.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId:  req.userId,
+          followingId: user.id,
         },
-      })
-      isFollowing = !!edge
-    }
+      },
+    })
+    isFollowing = !!edge
   }
 
   res.json({
     user: {
       ...publicUser(user),
       createdAt: user.createdAt,
+      // Hide bio from visitors when the profile is private.
+      bio: canViewContent ? (user.bio || null) : null,
     },
-    stats: {
-      reviews:   reviewCount,
-      watchlist: watchlistCount,
-      followers: followersCount,
-      following: followingCount,
-    },
+    stats,
     isFollowing,
     isSelf,
+    canViewContent,
   })
 })
 
 // Update the signed-in user's own profile (displayName / avatar / bio).
 // Username and email are immutable for simplicity.
 app.put('/api/users/me', authenticate, async (req, res) => {
-  const { displayName, avatar, bio } = req.body
+  const { displayName, avatar, bio, isPrivate } = req.body
   const data = {}
   if (typeof displayName === 'string' && displayName.trim()) {
     data.displayName = displayName.trim().slice(0, 60)
@@ -355,7 +364,8 @@ app.put('/api/users/me', authenticate, async (req, res) => {
     }
     data.avatar = normalized
   }
-  if (typeof bio === 'string')    data.bio    = bio.slice(0, 300)
+  if (typeof bio === 'string') data.bio = bio.slice(0, 300)
+  if (typeof isPrivate === 'boolean') data.isPrivate = isPrivate
 
   if (Object.keys(data).length === 0) {
     return res.status(400).json({ error: 'Nothing to update' })
@@ -374,6 +384,7 @@ app.put('/api/users/me', authenticate, async (req, res) => {
         email:       updated.email,
         avatar:      updated.avatar || null,
         bio:         updated.bio    || null,
+        isPrivate:   !!updated.isPrivate,
       },
     })
   } catch (err) {
@@ -384,11 +395,12 @@ app.put('/api/users/me', authenticate, async (req, res) => {
 
 // All reviews authored by `:username`, newest first.
 // Includes the basic user info so the frontend doesn't need a second lookup.
-app.get('/api/users/:username/reviews', async (req, res) => {
-  const user = await prisma.user.findUnique({
-    where: { username: req.params.username },
-  })
+app.get('/api/users/:username/reviews', attachUser, async (req, res) => {
+  const user = await findUserByUsername(req.params.username)
   if (!user) return res.status(404).json({ error: 'User not found' })
+  if (!canViewProfileContent(user, req.userId)) {
+    return res.status(403).json({ error: 'This profile is private', private: true, reviews: [] })
+  }
 
   const reviews = await prisma.review.findMany({
     where:   { userId: user.id },
@@ -402,11 +414,12 @@ app.get('/api/users/:username/reviews', async (req, res) => {
 // Different from /api/watchlist/:userId which is private and uses numeric id;
 // this one looks up by username and is intentionally public so other users
 // can see what someone wants to watch.
-app.get('/api/users/:username/watchlist', async (req, res) => {
-  const user = await prisma.user.findUnique({
-    where: { username: req.params.username },
-  })
+app.get('/api/users/:username/watchlist', attachUser, async (req, res) => {
+  const user = await findUserByUsername(req.params.username)
   if (!user) return res.status(404).json({ error: 'User not found' })
+  if (!canViewProfileContent(user, req.userId)) {
+    return res.status(403).json({ error: 'This profile is private', private: true, watchlist: [] })
+  }
 
   const items = await prisma.watchlist.findMany({
     where:   { userId: user.id },
@@ -434,10 +447,11 @@ async function decorateFollows(users, viewerId) {
 
 // List the users who follow `:username`.
 app.get('/api/users/:username/followers', attachUser, async (req, res) => {
-  const user = await prisma.user.findUnique({
-    where: { username: req.params.username },
-  })
+  const user = await findUserByUsername(req.params.username)
   if (!user) return res.status(404).json({ error: 'User not found' })
+  if (!canViewProfileContent(user, req.userId)) {
+    return res.status(403).json({ error: 'This profile is private', private: true, users: [] })
+  }
 
   const edges = await prisma.follow.findMany({
     where:   { followingId: user.id },
@@ -450,10 +464,11 @@ app.get('/api/users/:username/followers', attachUser, async (req, res) => {
 
 // List the users `:username` follows.
 app.get('/api/users/:username/following', attachUser, async (req, res) => {
-  const user = await prisma.user.findUnique({
-    where: { username: req.params.username },
-  })
+  const user = await findUserByUsername(req.params.username)
   if (!user) return res.status(404).json({ error: 'User not found' })
+  if (!canViewProfileContent(user, req.userId)) {
+    return res.status(403).json({ error: 'This profile is private', private: true, users: [] })
+  }
 
   const edges = await prisma.follow.findMany({
     where:   { followerId: user.id },
