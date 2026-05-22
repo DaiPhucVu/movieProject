@@ -44,7 +44,7 @@
 
       <!-- Grid -->
       <div class="media-grid">
-        <MediaCard v-for="m in results" :key="m.id" :media="m" />
+        <MediaCard v-for="m in results" :key="`${m.type}-${m.id}`" :media="m" />
       </div>
     </div>
   </div>

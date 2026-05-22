@@ -47,10 +47,40 @@
               <h1 class="cl-display profile-name mb-1">{{ profile.user.displayName }}</h1>
               <p class="cl-muted small mb-2">@{{ profile.user.username }} · joined {{ joinDate }}</p>
               <p v-if="profile.user.bio" class="profile-bio cl-text mb-0">{{ profile.user.bio }}</p>
-              <p v-else class="cl-dim small fst-italic mb-0">No bio yet.</p>
+              <p v-else-if="profile.canViewContent || profile.isSelf" class="cl-dim small fst-italic mb-0">No bio yet.</p>
+
+              <!-- Owner: quick public / private toggle -->
+              <div v-if="profile.isSelf" class="visibility-toggle mt-3">
+                <span class="cl-dim small text-uppercase visibility-label">Profile visibility</span>
+                <div class="filter-tabs visibility-tabs" role="group">
+                  <button
+                    type="button"
+                    class="filter-tab"
+                    :class="{ 'filter-tab-active': !profile.user.isPrivate }"
+                    :disabled="visibilitySaving"
+                    @click="setProfileVisibility(false)"
+                  >Public</button>
+                  <button
+                    type="button"
+                    class="filter-tab"
+                    :class="{ 'filter-tab-active': profile.user.isPrivate }"
+                    :disabled="visibilitySaving"
+                    @click="setProfileVisibility(true)"
+                  >Private</button>
+                </div>
+                <p class="cl-dim small mb-0 mt-1">
+                  {{ profile.user.isPrivate
+                      ? 'Only you can see your reviews and watchlist.'
+                      : 'Anyone can view your profile content.' }}
+                </p>
+              </div>
             </div>
             <div class="col-12 col-md-auto">
               <div class="d-flex gap-2 flex-wrap justify-content-md-end">
+                <span
+                  v-if="profile.user.isPrivate"
+                  class="cl-badge align-self-center"
+                >Private</span>
                 <!-- Self: edit profile -->
                 <button
                   v-if="profile.isSelf"
@@ -82,8 +112,8 @@
             </div>
           </div>
 
-          <!-- Stats row -->
-          <div class="stats-row mt-4 d-flex flex-wrap gap-4">
+          <!-- Stats row (hidden counts for visitors on private profiles) -->
+          <div v-if="profile.canViewContent" class="stats-row mt-4 d-flex flex-wrap gap-4">
             <button class="stat-item" type="button" @click="activeTab = 'reviews'">
               <span class="cl-display stat-val cl-accent">{{ profile.stats.reviews }}</span>
               <span class="cl-dim stat-label">Reviews</span>
@@ -110,8 +140,19 @@
         </div>
       </header>
 
+      <!-- Private profile notice for visitors -->
+      <div v-if="!profile.canViewContent" class="container py-5">
+        <div class="cl-card private-notice p-5 text-center mx-auto">
+          <div class="empty-icon mb-3">🔒</div>
+          <h2 class="cl-display h4 mb-2">This profile is private</h2>
+          <p class="cl-muted mb-0">
+            @{{ profile.user.displayName }} has chosen to keep their reviews and watchlist visible only to themselves.
+          </p>
+        </div>
+      </div>
+
       <!-- Tabs -->
-      <div class="container py-4">
+      <div v-else class="container py-4">
         <div class="filter-tabs mb-4" role="tablist">
           <button
             type="button"
@@ -288,6 +329,27 @@
                 ></textarea>
               </div>
 
+              <div>
+                <label class="form-label cl-muted small text-uppercase mb-1">Profile visibility</label>
+                <div class="filter-tabs visibility-tabs d-inline-flex" role="group">
+                  <button
+                    type="button"
+                    class="filter-tab"
+                    :class="{ 'filter-tab-active': !editForm.isPrivate }"
+                    @click="editForm.isPrivate = false"
+                  >Public</button>
+                  <button
+                    type="button"
+                    class="filter-tab"
+                    :class="{ 'filter-tab-active': editForm.isPrivate }"
+                    @click="editForm.isPrivate = true"
+                  >Private</button>
+                </div>
+                <p class="cl-dim small mt-1 mb-0">
+                  Private hides your reviews, watchlist, and connections from other users.
+                </p>
+              </div>
+
               <p v-if="editError" class="text-danger small mb-0">{{ editError }}</p>
 
               <div class="d-flex gap-2 justify-content-end">
@@ -338,7 +400,8 @@ const followLoading = ref(false)
 const editing    = ref(false)
 const editSaving = ref(false)
 const editError  = ref('')
-const editForm   = reactive({ displayName: '', avatar: '', bio: '' })
+const editForm   = reactive({ displayName: '', avatar: '', bio: '', isPrivate: false })
+const visibilitySaving = ref(false)
 const avatarFieldRef = ref(null)
 const avatarFileInput = ref(null)
 const avatarFileInputModal = ref(null)
@@ -371,13 +434,13 @@ const joinDate = computed(() => {
 // Items whose TMDB detail couldn't be loaded are quietly dropped.
 const watchlistMedia = computed(() =>
   watchlistItems.value
-    .map(item => mediaStore.getMovieById(item.mediaId))
+    .map(item => mediaStore.getMovieById(item.mediaId, item.type))
     .filter(Boolean)
 )
 
 // Used by reviews tab to show the poster of each reviewed title.
-function getMedia(id) {
-  return mediaStore.getMovieById(id)
+function getMedia(mediaId, type = 'movie') {
+  return mediaStore.getMovieById(mediaId, type)
 }
 
 // ── Data loading ────────────────────────────────────────────────────
@@ -403,7 +466,10 @@ async function loadProfile() {
 }
 
 async function loadReviews() {
-  if (!profile.value) return
+  if (!profile.value?.canViewContent) {
+    reviews.value = []
+    return
+  }
   reviewsLoading.value = true
   try {
     const res = await fetch(`${API}/users/${profile.value.user.username}/reviews`)
@@ -426,7 +492,10 @@ async function loadReviews() {
 }
 
 async function loadWatchlist() {
-  if (!profile.value) return
+  if (!profile.value?.canViewContent) {
+    watchlistItems.value = []
+    return
+  }
   watchlistLoading.value = true
   try {
     const res = await fetch(`${API}/users/${profile.value.user.username}/watchlist`)
@@ -478,8 +547,23 @@ function openEdit() {
   editForm.displayName = profile.value.user.displayName || ''
   editForm.avatar      = profile.value.user.avatar      || ''
   editForm.bio         = profile.value.user.bio         || ''
+  editForm.isPrivate   = !!profile.value.user.isPrivate
   editError.value = ''
   editing.value = true
+}
+
+async function setProfileVisibility(isPrivate) {
+  if (!profile.value?.isSelf || profile.value.user.isPrivate === isPrivate) return
+  visibilitySaving.value = true
+  const result = await auth.updateProfile({ isPrivate })
+  visibilitySaving.value = false
+  if (!result.success) {
+    alert(result.error || 'Could not update visibility.')
+    return
+  }
+  profile.value.user.isPrivate = !!result.user.isPrivate
+  profile.value.canViewContent = true
+  editForm.isPrivate = profile.value.user.isPrivate
 }
 
 function pickAvatarFile() {
@@ -525,6 +609,7 @@ async function submitEdit() {
     displayName: editForm.displayName,
     avatar:      editForm.avatar,
     bio:         editForm.bio,
+    isPrivate:   editForm.isPrivate,
   })
 
   editSaving.value = false
@@ -537,6 +622,7 @@ async function submitEdit() {
   // Mirror the changes onto the local profile object so the header updates
   // immediately without another network round-trip.
   profile.value.user = { ...profile.value.user, ...result.user }
+  profile.value.canViewContent = true
   editing.value = false
 }
 
@@ -735,10 +821,19 @@ watch(
 }
 
 /* -- Empty state -- */
-.empty-state {
+.empty-state,
+.private-notice {
   border-style: dashed;
   max-width: 560px;
   margin: 0 auto;
+}
+.visibility-label {
+  letter-spacing: 0.08em;
+  display: block;
+  margin-bottom: 6px;
+}
+.visibility-tabs {
+  display: inline-flex;
 }
 .empty-icon { font-size: 3rem; opacity: 0.6; }
 

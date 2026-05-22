@@ -63,6 +63,18 @@
         <p class="mb-0">Loading…</p>
       </div>
 
+      <!-- Private profile -->
+      <div
+        v-else-if="profilePrivate"
+        class="cl-card empty-state p-5 text-center mx-auto"
+      >
+        <div class="empty-icon mb-3">🔒</div>
+        <h2 class="cl-display h5 mb-2">This profile is private</h2>
+        <p class="cl-muted mb-0">
+          @{{ route.params.username }}'s followers and following lists are only visible to them.
+        </p>
+      </div>
+
       <!-- Empty -->
       <div
         v-else-if="filteredUsers.length === 0"
@@ -167,6 +179,7 @@ const auth   = useAuthStore()
 const followers = ref([])
 const following = ref([])
 const loading   = ref(true)
+const profilePrivate = ref(false)
 const pendingId = ref(null) // user id whose follow toggle is in-flight
 const search    = ref('')
 
@@ -207,6 +220,7 @@ const discoverUsers = computed(() => {
 // "Followers (N) | Following (N)" counts always render correctly.
 async function loadConnections() {
   loading.value = true
+  profilePrivate.value = false
   try {
     const headers = auth.token ? { Authorization: `Bearer ${auth.token}` } : {}
 
@@ -214,6 +228,13 @@ async function loadConnections() {
       fetch(`${API}/users/${route.params.username}/followers`, { headers }),
       fetch(`${API}/users/${route.params.username}/following`, { headers }),
     ])
+
+    if (followersRes.status === 403 || followingRes.status === 403) {
+      profilePrivate.value = true
+      followers.value = []
+      following.value = []
+      return
+    }
 
     if (!followersRes.ok || !followingRes.ok) {
       followers.value = []
