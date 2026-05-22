@@ -116,7 +116,7 @@
               <ReviewCard :review="review" />
               <div class="d-flex align-items-center mt-2 gap-2">
                 <RouterLink
-                  :to="`/media/${review.mediaId}`"
+                  :to="{ name: 'MediaDetail', params: { id: review.mediaId }, query: { type: getMedia(review.mediaId)?.type || 'movie' } }"
                   class="text-decoration-none text-light d-flex flex-column align-items-center"
                   style="width: 80px;"
                 >

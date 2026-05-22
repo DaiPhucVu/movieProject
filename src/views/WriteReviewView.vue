@@ -132,7 +132,11 @@ function submitReview() {
   } else {
     mediaStore.addReview(payload)
   }
-  router.push(`/media/${selectedMedia.value.id}`)
+  router.push({
+    name: 'MediaDetail',
+    params: { id: selectedMedia.value.id },
+    query: { type: selectedMedia.value.type || 'movie' },
+  })
 }
 
 function deleteReview() {
