@@ -19,11 +19,29 @@
         <div class="container py-5 position-relative">
           <div class="row g-4 align-items-end">
             <div class="col-auto">
-              <img
-                :src="avatarUrl(profile.user, 240)"
-                :alt="profile.user.displayName"
-                class="profile-avatar"
-              />
+              <div class="avatar-wrap">
+                <img
+                  :src="displayAvatar"
+                  :alt="profile.user.displayName"
+                  class="profile-avatar"
+                />
+                <button
+                  v-if="profile.isSelf"
+                  type="button"
+                  class="avatar-edit-btn"
+                  title="Upload profile photo"
+                  aria-label="Upload profile photo"
+                  :disabled="avatarUploading"
+                  @click="pickAvatarFile"
+                >{{ avatarUploading ? '…' : '+' }}</button>
+                <input
+                  ref="avatarFileInput"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/*"
+                  class="visually-hidden"
+                  @change="onAvatarFileSelected"
+                />
+              </div>
             </div>
             <div class="col">
               <h1 class="cl-display profile-name mb-1">{{ profile.user.displayName }}</h1>
@@ -197,6 +215,55 @@
             </div>
 
             <form @submit.prevent="submitEdit" class="d-flex flex-column gap-3">
+              <!-- Avatar preview in modal -->
+              <div class="text-center mb-1">
+                <img
+                  :src="avatarUrl({ ...profile.user, avatar: editForm.avatar || null }, 120)"
+                  :alt="editForm.displayName"
+                  class="edit-avatar-preview"
+                />
+              </div>
+
+              <div ref="avatarFieldRef" class="avatar-edit-section">
+                <label class="form-label cl-muted small text-uppercase mb-1">Profile photo</label>
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                  <button
+                    type="button"
+                    class="cl-btn cl-btn-primary cl-btn-sm"
+                    :disabled="avatarUploading"
+                    @click="pickAvatarFile"
+                  >
+                    {{ avatarUploading ? 'Uploading…' : 'Upload from device' }}
+                  </button>
+                  <button
+                    v-if="editForm.avatar"
+                    type="button"
+                    class="cl-btn cl-btn-ghost cl-btn-sm"
+                    :disabled="avatarUploading"
+                    @click="clearAvatar"
+                  >
+                    Remove photo
+                  </button>
+                </div>
+                <input
+                  ref="avatarFileInputModal"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/*"
+                  class="visually-hidden"
+                  @change="onAvatarFileSelected"
+                />
+                <label class="form-label cl-muted small text-uppercase mb-1 mt-2">Or paste image URL</label>
+                <input
+                  v-model="editForm.avatar"
+                  type="url"
+                  class="form-control bg-dark text-light border-secondary"
+                  placeholder="https://… (optional)"
+                />
+                <p class="cl-dim small mt-1 mb-0">
+                  JPG, PNG or WebP under 5 MB. Leave empty for the default initials avatar.
+                </p>
+              </div>
+
               <div>
                 <label class="form-label cl-muted small text-uppercase mb-1">Display name</label>
                 <input
@@ -206,19 +273,6 @@
                   maxlength="60"
                   required
                 />
-              </div>
-
-              <div>
-                <label class="form-label cl-muted small text-uppercase mb-1">Avatar URL</label>
-                <input
-                  v-model="editForm.avatar"
-                  type="url"
-                  class="form-control bg-dark text-light border-secondary"
-                  placeholder="https://… (leave blank for default)"
-                />
-                <p class="cl-dim small mt-1 mb-0">
-                  Paste any image URL. Leave empty to use the default initials avatar.
-                </p>
               </div>
 
               <div>
@@ -256,6 +310,7 @@ import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useMediaStore } from '../stores/media'
 import { avatarUrl } from '../utils/avatar'
+import { fileToAvatarDataUrl } from '../utils/imageFile'
 import MediaCard from '../components/MediaCard.vue'
 import ReviewCard from '../components/ReviewCard.vue'
 
@@ -284,6 +339,23 @@ const editing    = ref(false)
 const editSaving = ref(false)
 const editError  = ref('')
 const editForm   = reactive({ displayName: '', avatar: '', bio: '' })
+const avatarFieldRef = ref(null)
+const avatarFileInput = ref(null)
+const avatarFileInputModal = ref(null)
+const avatarUploading = ref(false)
+
+// Live preview when editing or right after a device upload (before save).
+const displayAvatar = computed(() => {
+  if (!profile.value?.user) return ''
+  const previewUser = {
+    ...profile.value.user,
+    avatar: editForm.avatar || profile.value.user.avatar || null,
+  }
+  if (editing.value || editForm.avatar) {
+    return avatarUrl(previewUser, 240)
+  }
+  return avatarUrl(profile.value.user, 240)
+})
 
 // ── Computed ────────────────────────────────────────────────────────
 // Format the createdAt timestamp into something readable (e.g. "May 2026")
@@ -410,6 +482,37 @@ function openEdit() {
   editing.value = true
 }
 
+function pickAvatarFile() {
+  const input = editing.value
+    ? avatarFileInputModal.value
+    : avatarFileInput.value
+  input?.click()
+}
+
+async function onAvatarFileSelected(event) {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file || !profile.value?.isSelf) return
+
+  avatarUploading.value = true
+  editError.value = ''
+
+  try {
+    const dataUrl = await fileToAvatarDataUrl(file)
+    if (!editing.value) openEdit()
+    editForm.avatar = dataUrl
+  } catch (err) {
+    editError.value = err.message || 'Could not use that image.'
+    if (!editing.value) editing.value = true
+  } finally {
+    avatarUploading.value = false
+  }
+}
+
+function clearAvatar() {
+  editForm.avatar = ''
+}
+
 function closeEdit() {
   editing.value = false
 }
@@ -487,12 +590,50 @@ watch(
   );
   pointer-events: none;
 }
+.avatar-wrap {
+  position: relative;
+  display: inline-block;
+}
 .profile-avatar {
   width: 120px; height: 120px;
   border-radius: 50%;
   object-fit: cover;
   border: 3px solid var(--cl-accent);
   box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  display: block;
+}
+.avatar-edit-btn {
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--cl-bg);
+  background: var(--cl-accent);
+  color: var(--cl-bg);
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+  transition: background var(--cl-transition), transform var(--cl-transition);
+}
+.avatar-edit-btn:hover {
+  background: var(--cl-accent-hover);
+  transform: translateX(-50%) scale(1.06);
+}
+.edit-avatar-preview {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--cl-accent);
 }
 .profile-name {
   font-size: clamp(1.8rem, 4vw, 2.6rem);
