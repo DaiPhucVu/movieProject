@@ -136,7 +136,7 @@ const typeFilters = [
 // Items that couldn't be loaded (e.g. network failure) are skipped.
 const watchlistMovies = computed(() => {
   return mediaStore.watchlist
-    .map(item => mediaStore.getMovieById(item.mediaId))
+    .map(item => mediaStore.getMovieById(item.mediaId, item.type || 'movie'))
     .filter(m => m != null)
 })
 

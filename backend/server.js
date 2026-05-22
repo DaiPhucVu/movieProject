@@ -12,7 +12,8 @@ const port = process.env.PORT || 3000
 const jwtSecret = process.env.JWT_SECRET || 'secret'
 
 app.use(cors())
-app.use(express.json())
+// Avatars may be sent as compressed base64 data URLs from the profile upload UI.
+app.use(express.json({ limit: '2mb' }))
 
 function generateToken(user) {
   return jwt.sign({ userId: user.id }, jwtSecret, { expiresIn: '7d' })
@@ -34,6 +35,60 @@ function authenticate(req, res, next) {
   }
 }
 
+// Soft variant of `authenticate`: if a valid token is supplied, set req.userId.
+// If there's no token (or it's invalid), continue without an error so the
+// route can still respond as if the viewer were a guest.
+// Used by public endpoints that want to personalise the response when the
+// viewer happens to be signed in (e.g. an `isFollowing` flag on a profile).
+function attachUser(req, res, next) {
+  const header = req.headers.authorization
+  if (header && header.startsWith('Bearer ')) {
+    try {
+      const payload = jwt.verify(header.split(' ')[1], jwtSecret)
+      req.userId = payload.userId
+    } catch (err) {
+      // invalid token → treat as guest
+    }
+  }
+  next()
+}
+
+// Shape a Prisma User row into the public profile shape the frontend uses.
+// Strips out the password hash and email by default.
+function publicUser(u) {
+  return {
+    id:          u.id,
+    username:    u.username,
+    displayName: u.displayName,
+    avatar:      u.avatar || null,
+    bio:         u.bio    || null,
+    isPrivate:   !!u.isPrivate,
+  }
+}
+
+// Private profiles hide reviews, watchlist, and connections from other users.
+function canViewProfileContent(profileUser, viewerId) {
+  if (!profileUser.isPrivate) return true
+  return viewerId === profileUser.id
+}
+
+async function findUserByUsername(username) {
+  return prisma.user.findUnique({ where: { username } })
+}
+
+// Accept https URLs or data:image/* base64 from the device upload flow.
+function normalizeAvatar(value) {
+  const v = value.trim()
+  if (!v) return null
+  if (v.startsWith('http://') || v.startsWith('https://')) {
+    return v.length <= 2000 ? v : false
+  }
+  if (/^data:image\/(jpeg|png|webp);base64,/.test(v)) {
+    return v.length <= 600_000 ? v : false
+  }
+  return false
+}
+
 app.get('/', (req, res) => {
   res.json({ message: 'CineLOG backend is running' })
 })
@@ -52,7 +107,18 @@ app.post('/api/auth/register', async (req, res) => {
     })
 
     const token = generateToken(user)
-    return res.json({ user: { id: user.id, username: user.username, displayName: user.displayName, email: user.email }, token })
+    return res.json({
+      user: {
+        id:          user.id,
+        username:    user.username,
+        displayName: user.displayName,
+        email:       user.email,
+        avatar:      user.avatar || null,
+        bio:         user.bio    || null,
+        isPrivate:   !!user.isPrivate,
+      },
+      token,
+    })
   } catch (err) {
     const message = err.code === 'P2002' ? 'Username or email already exists' : 'Unable to create account'
     return res.status(400).json({ error: message })
@@ -74,7 +140,18 @@ app.post('/api/auth/login', async (req, res) => {
   if (!valid) return res.status(401).json({ error: 'Invalid credentials' })
 
   const token = generateToken(user)
-  return res.json({ user: { id: user.id, username: user.username, displayName: user.displayName, email: user.email }, token })
+  return res.json({
+    user: {
+      id:          user.id,
+      username:    user.username,
+      displayName: user.displayName,
+      email:       user.email,
+      avatar:      user.avatar || null,
+      bio:         user.bio    || null,
+      isPrivate:   !!user.isPrivate,
+    },
+    token,
+  })
 })
 
 // ── Reviews ────────────────────────────────────────────────────────
@@ -188,6 +265,252 @@ app.post('/api/watchlist/toggle', authenticate, async (req, res) => {
     console.error('WATCHLIST ERROR:', err)
     return res.status(500).json({ error: 'Failed to update watchlist' })
   }
+})
+
+// ── Users / Profiles ───────────────────────────────────────────────
+// Platform-wide user search.
+// Used by ConnectionsView's "Discover other users" section so signed-in
+// users can find accounts they don't already follow. The viewer (if any)
+// is excluded from results, and `isFollowing` is decorated per row so the
+// UI can render the right action button.
+app.get('/api/users', attachUser, async (req, res) => {
+  const q = String(req.query.q || '').trim()
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 50)
+
+  if (!q) return res.json({ users: [] })
+
+  // SQLite's LIKE is case-insensitive for ASCII by default, which is fine
+  // for usernames and English display names. Prisma's `contains` translates
+  // to a LIKE filter under the hood.
+  const rows = await prisma.user.findMany({
+    where: {
+      AND: [
+        req.userId ? { id: { not: req.userId } } : {},
+        {
+          OR: [
+            { username:    { contains: q } },
+            { displayName: { contains: q } },
+          ],
+        },
+      ],
+    },
+    take:    limit,
+    orderBy: { username: 'asc' },
+  })
+
+  res.json({ users: await decorateFollows(rows, req.userId) })
+})
+
+// Public profile lookup by username.
+// When called with a Bearer token, the response also includes `isFollowing`
+// and `isSelf` flags so the frontend can render the right action button.
+app.get('/api/users/:username', attachUser, async (req, res) => {
+  const user = await findUserByUsername(req.params.username)
+  if (!user) return res.status(404).json({ error: 'User not found' })
+
+  const isSelf = req.userId === user.id
+  const canViewContent = canViewProfileContent(user, req.userId)
+
+  let stats = { reviews: 0, watchlist: 0, followers: 0, following: 0 }
+  if (canViewContent) {
+    const [reviewCount, watchlistCount, followersCount, followingCount] = await Promise.all([
+      prisma.review.count({ where: { userId: user.id } }),
+      prisma.watchlist.count({ where: { userId: user.id } }),
+      prisma.follow.count({ where: { followingId: user.id } }),
+      prisma.follow.count({ where: { followerId: user.id } }),
+    ])
+    stats = { reviews: reviewCount, watchlist: watchlistCount, followers: followersCount, following: followingCount }
+  }
+
+  let isFollowing = false
+  if (req.userId && !isSelf) {
+    const edge = await prisma.follow.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId:  req.userId,
+          followingId: user.id,
+        },
+      },
+    })
+    isFollowing = !!edge
+  }
+
+  res.json({
+    user: {
+      ...publicUser(user),
+      createdAt: user.createdAt,
+      // Hide bio from visitors when the profile is private.
+      bio: canViewContent ? (user.bio || null) : null,
+    },
+    stats,
+    isFollowing,
+    isSelf,
+    canViewContent,
+  })
+})
+
+// Update the signed-in user's own profile (displayName / avatar / bio).
+// Username and email are immutable for simplicity.
+app.put('/api/users/me', authenticate, async (req, res) => {
+  const { displayName, avatar, bio, isPrivate } = req.body
+  const data = {}
+  if (typeof displayName === 'string' && displayName.trim()) {
+    data.displayName = displayName.trim().slice(0, 60)
+  }
+  if (typeof avatar === 'string') {
+    const normalized = normalizeAvatar(avatar)
+    if (normalized === false) {
+      return res.status(400).json({ error: 'Invalid avatar. Use an image URL or a smaller photo.' })
+    }
+    data.avatar = normalized
+  }
+  if (typeof bio === 'string') data.bio = bio.slice(0, 300)
+  if (typeof isPrivate === 'boolean') data.isPrivate = isPrivate
+
+  if (Object.keys(data).length === 0) {
+    return res.status(400).json({ error: 'Nothing to update' })
+  }
+
+  try {
+    const updated = await prisma.user.update({
+      where: { id: req.userId },
+      data,
+    })
+    res.json({
+      user: {
+        id:          updated.id,
+        username:    updated.username,
+        displayName: updated.displayName,
+        email:       updated.email,
+        avatar:      updated.avatar || null,
+        bio:         updated.bio    || null,
+        isPrivate:   !!updated.isPrivate,
+      },
+    })
+  } catch (err) {
+    console.error('Profile update failed:', err)
+    res.status(500).json({ error: 'Could not update profile' })
+  }
+})
+
+// All reviews authored by `:username`, newest first.
+// Includes the basic user info so the frontend doesn't need a second lookup.
+app.get('/api/users/:username/reviews', attachUser, async (req, res) => {
+  const user = await findUserByUsername(req.params.username)
+  if (!user) return res.status(404).json({ error: 'User not found' })
+  if (!canViewProfileContent(user, req.userId)) {
+    return res.status(403).json({ error: 'This profile is private', private: true, reviews: [] })
+  }
+
+  const reviews = await prisma.review.findMany({
+    where:   { userId: user.id },
+    include: { user: true },
+    orderBy: { createdAt: 'desc' },
+  })
+  res.json({ reviews })
+})
+
+// Public watchlist for `:username`.
+// Different from /api/watchlist/:userId which is private and uses numeric id;
+// this one looks up by username and is intentionally public so other users
+// can see what someone wants to watch.
+app.get('/api/users/:username/watchlist', attachUser, async (req, res) => {
+  const user = await findUserByUsername(req.params.username)
+  if (!user) return res.status(404).json({ error: 'User not found' })
+  if (!canViewProfileContent(user, req.userId)) {
+    return res.status(403).json({ error: 'This profile is private', private: true, watchlist: [] })
+  }
+
+  const items = await prisma.watchlist.findMany({
+    where:   { userId: user.id },
+    orderBy: { id: 'desc' },
+  })
+  res.json({ watchlist: items })
+})
+
+// Helper used by /followers and /following — given a list of follow edges,
+// resolve them into the matching user objects and decorate with
+// `isFollowing` (from the signed-in viewer's perspective) when possible.
+async function decorateFollows(users, viewerId) {
+  if (!viewerId) return users.map(u => ({ ...publicUser(u), isFollowing: false }))
+
+  const viewerEdges = await prisma.follow.findMany({
+    where:  { followerId: viewerId, followingId: { in: users.map(u => u.id) } },
+    select: { followingId: true },
+  })
+  const followingSet = new Set(viewerEdges.map(e => e.followingId))
+  return users.map(u => ({
+    ...publicUser(u),
+    isFollowing: followingSet.has(u.id),
+  }))
+}
+
+// List the users who follow `:username`.
+app.get('/api/users/:username/followers', attachUser, async (req, res) => {
+  const user = await findUserByUsername(req.params.username)
+  if (!user) return res.status(404).json({ error: 'User not found' })
+  if (!canViewProfileContent(user, req.userId)) {
+    return res.status(403).json({ error: 'This profile is private', private: true, users: [] })
+  }
+
+  const edges = await prisma.follow.findMany({
+    where:   { followingId: user.id },
+    include: { follower: true },
+    orderBy: { createdAt: 'desc' },
+  })
+  const followers = edges.map(e => e.follower)
+  res.json({ users: await decorateFollows(followers, req.userId) })
+})
+
+// List the users `:username` follows.
+app.get('/api/users/:username/following', attachUser, async (req, res) => {
+  const user = await findUserByUsername(req.params.username)
+  if (!user) return res.status(404).json({ error: 'User not found' })
+  if (!canViewProfileContent(user, req.userId)) {
+    return res.status(403).json({ error: 'This profile is private', private: true, users: [] })
+  }
+
+  const edges = await prisma.follow.findMany({
+    where:   { followerId: user.id },
+    include: { following: true },
+    orderBy: { createdAt: 'desc' },
+  })
+  const following = edges.map(e => e.following)
+  res.json({ users: await decorateFollows(following, req.userId) })
+})
+
+// Toggle follow on `:username`. The viewer must be signed in and can't
+// follow themselves. Returns the new state so the UI can flip its button.
+app.post('/api/users/:username/follow', authenticate, async (req, res) => {
+  const target = await prisma.user.findUnique({
+    where: { username: req.params.username },
+  })
+  if (!target) return res.status(404).json({ error: 'User not found' })
+  if (target.id === req.userId) {
+    return res.status(400).json({ error: "You can't follow yourself" })
+  }
+
+  const existing = await prisma.follow.findUnique({
+    where: {
+      followerId_followingId: {
+        followerId:  req.userId,
+        followingId: target.id,
+      },
+    },
+  })
+
+  if (existing) {
+    await prisma.follow.delete({ where: { id: existing.id } })
+    return res.json({ isFollowing: false })
+  }
+
+  await prisma.follow.create({
+    data: {
+      followerId:  req.userId,
+      followingId: target.id,
+    },
+  })
+  res.json({ isFollowing: true })
 })
 
 // ── Error handler ────

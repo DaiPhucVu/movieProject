@@ -38,7 +38,7 @@
               </template>
               <template v-else>
                 <RouterLink
-                  :to="`/login?redirect=/media/${media.id}`"
+                  :to="`/login?redirect=/media/${media.id}?type=${media.type || 'movie'}`"
                   class="cl-btn cl-btn-primary w-100"
                 >Sign in to interact</RouterLink>
               </template>
@@ -126,7 +126,7 @@
           >Write the first review</RouterLink>
           <RouterLink
             v-else
-            :to="`/login?redirect=/media/${media.id}`"
+            :to="`/login?redirect=/media/${media.id}?type=${media.type || 'movie'}`"
             class="cl-btn cl-btn-primary"
           >Sign in to review</RouterLink>
         </div>
@@ -165,7 +165,7 @@
 
 <script setup>
 import { computed, ref, watch, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useMediaStore } from '../stores/media'
 import { useAuthStore } from '../stores/auth'
 import ReviewCard from '../components/ReviewCard.vue'
@@ -174,6 +174,7 @@ import PaginationBar from '../components/PaginationBar.vue'
 const API = 'http://localhost:3000/api'
 
 const route = useRoute()
+const router = useRouter()
 const mediaStore = useMediaStore()
 const auth = useAuthStore()
 
@@ -190,7 +191,7 @@ const mediaType = computed(() => route.query.type || 'movie')
 
 // getMovieById checks detailCache first (populated by loadDetail), then movies.
 // After loadMedia() runs, the title is in the cache.
-const media = computed(() => mediaStore.getMovieById(mediaId.value))
+const media = computed(() => mediaStore.getMovieById(mediaId.value, mediaType.value))
 
 const inWatchlist = computed(() =>
   media.value ? mediaStore.isInWatchlist(media.value.id) : false
@@ -249,7 +250,19 @@ watch(totalPages, (newTotal) => {
 async function loadMedia() {
   loadingMedia.value = true
   try {
-    await mediaStore.loadDetail(mediaId.value, mediaType.value)
+    let detail = await mediaStore.loadDetail(mediaId.value, mediaType.value)
+    // TMDB reuses numeric ids across movie vs TV — retry the other type if needed.
+    if (!detail) {
+      const alt = mediaType.value === 'tv' ? 'movie' : 'tv'
+      detail = await mediaStore.loadDetail(mediaId.value, alt)
+      if (detail && detail.type !== mediaType.value) {
+        await router.replace({
+          name: 'MediaDetail',
+          params: { id: String(mediaId.value) },
+          query: { ...route.query, type: detail.type },
+        })
+      }
+    }
   } catch (err) {
     console.error('Could not load title:', err)
   } finally {
@@ -272,8 +285,8 @@ onMounted(async () => {
   await Promise.all([loadMedia(), loadReviews()])
 })
 
-// Reload everything when navigating between movies (e.g. /media/1 → /media/2)
-watch(mediaId, async () => {
+// Reload when id or movie/tv type changes (e.g. /media/76479?type=movie → type=tv)
+watch([mediaId, mediaType], async () => {
   if (mediaId.value) {
     await Promise.all([loadMedia(), loadReviews()])
   }
