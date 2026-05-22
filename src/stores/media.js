@@ -138,13 +138,16 @@ export const useMediaStore = defineStore('media', () => {
   }
 
   //  HELPERS 
-  function getMovieById(id) {
+  function getMovieById(id, type = 'movie') {
+    const key = `${type}-${id}`
+    if (detailCache.value[key]) return detailCache.value[key]
+
     const cached = Object.values(detailCache.value)
-      .find(d => d.id === Number(id))
+      .find(d => d.id === Number(id) && (!type || d.type === type))
 
     if (cached) return cached
 
-    return movies.value.find(m => m.id === Number(id))
+    return movies.value.find(m => m.id === Number(id) && (!type || m.type === type))
   }
 
   //  REVIEWS 
