@@ -77,7 +77,7 @@ function shapeMovie(item) {
     backdrop:    item.backdrop_path ? `${BACKDROP}${item.backdrop_path}`   : '',
     synopsis:    item.overview || '',
     likes:       item.vote_count || 0,
-    reviewCount: 0,   // comes from your own backend
+    reviewCount: 0,   
     director: '', cast: [], duration: '',
   }
 }
