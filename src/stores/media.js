@@ -205,6 +205,53 @@ export const useMediaStore = defineStore('media', () => {
     }
   }
 
+  async function updateReview(reviewId, reviewData) {
+    try {
+      const res = await fetch(`${API}/reviews/${reviewId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders(),
+        },
+        body: JSON.stringify(reviewData),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        return { success: false, error: data.error }
+      }
+
+      const idx = reviews.value.findIndex(r => r.id === Number(reviewId))
+      if (idx !== -1) reviews.value[idx] = data.review
+
+      return { success: true, review: data.review }
+    } catch (err) {
+      return { success: false, error: 'Server error' }
+    }
+  }
+
+  async function deleteReview(reviewId) {
+    try {
+      const res = await fetch(`${API}/reviews/${reviewId}`, {
+        method: 'DELETE',
+        headers: { ...authHeaders() },
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        return { success: false, error: data.error }
+      }
+
+      reviews.value = reviews.value.filter(r => r.id !== Number(reviewId))
+
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: 'Server error' }
+    }
+  }
+
   //  WATCHLIST 
 
   function isInWatchlist(mediaId) {
@@ -317,6 +364,8 @@ export const useMediaStore = defineStore('media', () => {
 
     fetchReviewsByMediaId,
     addReview,
+    updateReview,
+    deleteReview,
     getReviewsByMediaId,
 
     fetchWatchlist,
