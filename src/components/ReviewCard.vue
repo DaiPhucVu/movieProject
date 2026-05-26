@@ -19,8 +19,8 @@
         <span>♥</span> {{ review.likes }}
       </button>
       <div v-if="canEdit" class="review-actions">
-        <RouterLink :to="`/review/edit/${review.id}`" class="btn btn-ghost btn-xs">Edit</RouterLink>
-        <button class="btn btn-danger btn-xs" @click="$emit('delete', review.id)">Delete</button>
+        <RouterLink :to="`/review/edit/${review.id}`" class="action-btn edit-btn">Edit</RouterLink>
+        <button class="action-btn delete-btn" @click="$emit('delete', review.id)">Delete</button>
       </div>
     </div>
   </div>
@@ -77,5 +77,9 @@ function formatDate(d) {
 }
 .like-btn:hover, .like-btn.liked { color: var(--red); border-color: rgba(232,93,93,0.4); background: rgba(232,93,93,0.08); }
 .review-actions { display: flex; gap: 8px; }
-.btn-xs { padding: 5px 12px; font-size: 0.78rem; }
+.action-btn { padding: 5px 12px; font-size: 0.78rem; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.edit-btn { background: transparent; border: 1px solid var(--border, #444); color: var(--text, #fff); text-decoration: none; display: inline-flex; align-items: center; }
+.edit-btn:hover { background: rgba(255,255,255,0.08); }
+.delete-btn { background: transparent; border: 1.5px solid #e05a6b; color: #e05a6b; }
+.delete-btn:hover { background: #e05a6b; color: #fff; }
 </style>
