@@ -48,13 +48,6 @@
             <p v-if="errors.rating" class="error">{{ errors.rating }}</p>
           </div>
 
-          <!-- Title -->
-          <div class="form-group">
-            <label class="form-label">Review Title</label>
-            <input v-model="form.title" type="text" class="form-input" placeholder="Summarise your review..." maxlength="120" />
-            <p v-if="errors.title" class="error">{{ errors.title }}</p>
-          </div>
-
           <!-- Body -->
           <div class="form-group">
             <label class="form-label">Your Review</label>
@@ -63,16 +56,10 @@
             <p v-if="errors.body" class="error">{{ errors.body }}</p>
           </div>
 
-          <!-- Spoiler toggle -->
-          <div class="form-group inline">
-            <label class="form-label">Contains spoilers?</label>
-            <input v-model="form.hasSpoilers" type="checkbox" />
-          </div>
-
           <!-- Actions -->
           <div class="form-actions">
-            <button v-if="isEditing" type="button" class="btn btn-danger" @click="deleteReview">Delete</button>
-            <button type="submit" class="btn btn-primary" :disabled="!selectedMedia">
+            <button v-if="isEditing" type="button" class="action-btn danger-btn" @click="deleteReview">Delete</button>
+            <button type="submit" class="action-btn primary-btn" :disabled="!selectedMedia">
               {{ isEditing ? 'Update Review' : 'Publish Review' }}
             </button>
           </div>
@@ -98,8 +85,8 @@ const isEditing = computed(() => !!route.params.reviewId)
 const mediaSearch = ref('')
 const selectedMedia = ref(null)
 
-const form = reactive({ rating: 0, title: '', body: '', hasSpoilers: false })
-const errors = reactive({ rating: '', title: '', body: '' })
+const form = reactive({ rating: 0, body: '' })
+const errors = reactive({ rating: '', body: '' })
 
 const filteredMedia = computed(() =>
   mediaStore.movies.filter(m => m.title.toLowerCase().includes(mediaSearch.value.toLowerCase())).slice(0, 6)
@@ -112,7 +99,6 @@ if (route.params.mediaId) {
   if (preselected) {
     selectedMedia.value = preselected
   } else {
-    // Not in store cache yet — load it from TMDB then select it
     mediaStore.loadDetail(Number(route.params.mediaId), mediaType).then(detail => {
       if (detail) selectedMedia.value = detail
     })
@@ -121,34 +107,33 @@ if (route.params.mediaId) {
 
 // Prefill if editing
 if (isEditing.value) {
-  const existing = mediaStore.reviews.find(r => r.id === route.params.reviewId)
+  const existing = mediaStore.reviews.find(r => r.id === Number(route.params.reviewId))
   if (existing) {
     selectedMedia.value = mediaStore.getMovieById(existing.mediaId)
     form.rating = existing.rating
-    form.title = existing.title
-    form.body = existing.body
-    form.hasSpoilers = existing.hasSpoilers ?? false
+    form.body = existing.content ?? ''
   }
 }
 
 function validate() {
   errors.rating = form.rating === 0 ? 'Please give a rating.' : ''
-  errors.title = !form.title.trim() ? 'Title is required.' : ''
   errors.body = form.body.trim().length < 20 ? 'Review must be at least 20 characters.' : ''
-  return !errors.rating && !errors.title && !errors.body
+  return !errors.rating && !errors.body
 }
 
 async function submitReview() {
   if (!validate()) return
   const payload = {
     mediaId: selectedMedia.value.id,
-    rating: form.rating,
+    rating: parseInt(form.rating),
     content: form.body,
-    title: form.title,
-    hasSpoilers: form.hasSpoilers,
   }
   if (isEditing.value) {
-    await mediaStore.updateReview(route.params.reviewId, payload)
+    const result = await mediaStore.updateReview(route.params.reviewId, payload)
+    if (!result.success) {
+      errors.body = result.error || 'Failed to update review. Please try again.'
+      return
+    }
   } else {
     const result = await mediaStore.addReview(payload)
     if (!result.success) {
@@ -163,9 +148,14 @@ async function submitReview() {
   })
 }
 
-function deleteReview() {
-  mediaStore.deleteReview(route.params.reviewId)
-  router.push('/')
+async function deleteReview() {
+  if (!confirm('Delete this review? This cannot be undone.')) return
+  const result = await mediaStore.deleteReview(route.params.reviewId)
+  if (result.success) {
+    router.push('/')
+  } else {
+    alert(result.error || 'Could not delete review.')
+  }
 }
 </script>
 
@@ -230,6 +220,28 @@ function deleteReview() {
 .error { font-size: 0.78rem; color: #e05a6b; margin: 0; }
 
 .form-actions { display: flex; gap: 10px; justify-content: flex-end; padding-top: 8px; }
-.btn-danger { background: transparent; border: 1px solid #e05a6b; color: #e05a6b; }
-.btn-danger:hover { background: #e05a6b; color: #fff; }
+
+.action-btn {
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+.action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.primary-btn {
+  background: #e5a00d;
+  color: #000;
+}
+.primary-btn:hover:not(:disabled) { background: #f0b429; }
+
+.danger-btn {
+  background: transparent;
+  border: 1.5px solid #e05a6b;
+  color: #e05a6b;
+}
+.danger-btn:hover { background: #e05a6b; color: #fff; }
 </style>
