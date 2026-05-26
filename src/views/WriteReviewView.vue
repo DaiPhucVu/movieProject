@@ -105,6 +105,20 @@ const filteredMedia = computed(() =>
   mediaStore.movies.filter(m => m.title.toLowerCase().includes(mediaSearch.value.toLowerCase())).slice(0, 6)
 )
 
+// Pre-select media when coming from a media page (/review/new/:mediaId)
+if (route.params.mediaId) {
+  const mediaType = route.query.type || 'movie'
+  const preselected = mediaStore.getMovieById(Number(route.params.mediaId), mediaType)
+  if (preselected) {
+    selectedMedia.value = preselected
+  } else {
+    // Not in store cache yet — load it from TMDB then select it
+    mediaStore.loadDetail(Number(route.params.mediaId), mediaType).then(detail => {
+      if (detail) selectedMedia.value = detail
+    })
+  }
+}
+
 // Prefill if editing
 if (isEditing.value) {
   const existing = mediaStore.reviews.find(r => r.id === route.params.reviewId)
@@ -124,13 +138,23 @@ function validate() {
   return !errors.rating && !errors.title && !errors.body
 }
 
-function submitReview() {
+async function submitReview() {
   if (!validate()) return
-  const payload = { ...form, mediaId: selectedMedia.value.id, userId: auth.user.id }
+  const payload = {
+    mediaId: selectedMedia.value.id,
+    rating: form.rating,
+    content: form.body,
+    title: form.title,
+    hasSpoilers: form.hasSpoilers,
+  }
   if (isEditing.value) {
-    mediaStore.updateReview(route.params.reviewId, payload)
+    await mediaStore.updateReview(route.params.reviewId, payload)
   } else {
-    mediaStore.addReview(payload)
+    const result = await mediaStore.addReview(payload)
+    if (!result.success) {
+      errors.body = result.error || 'Failed to submit review. Please try again.'
+      return
+    }
   }
   router.push({
     name: 'MediaDetail',
