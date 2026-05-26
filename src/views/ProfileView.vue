@@ -196,7 +196,7 @@
           <div v-else class="row g-3">
             <div v-for="r in reviews" :key="r.id" class="col-12 col-md-6">
               <div class="cl-card p-3 h-100">
-                <ReviewCard :review="r" />
+                <ReviewCard :review="r" @delete="handleDeleteReview" />
                 <RouterLink
                   v-if="getMedia(r.mediaId)"
                   :to="{ name: 'MediaDetail', params: { id: r.mediaId }, query: { type: getMedia(r.mediaId)?.type || 'movie' } }"
@@ -488,6 +488,28 @@ async function loadReviews() {
     reviews.value = []
   } finally {
     reviewsLoading.value = false
+  }
+}
+
+async function handleDeleteReview(reviewId) {
+  if (!confirm('Delete this review? This cannot be undone.')) return
+  try {
+    const res = await fetch(`${API}/reviews/${reviewId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(auth.token ? { Authorization: `Bearer ${auth.token}` } : {}),
+      },
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      alert(data.error || 'Could not delete review.')
+      return
+    }
+    reviews.value = reviews.value.filter(r => r.id !== reviewId)
+  } catch (err) {
+    console.error('Delete review error:', err)
+    alert('Could not reach the server. Please try again.')
   }
 }
 
