@@ -137,7 +137,14 @@ export const useMediaStore = defineStore('media', () => {
     }
   }
 
-  //  HELPERS 
+  async function resolveDetail(id, preferredType = 'movie') {
+    let detail = await loadDetail(id, preferredType)
+    if (!detail) {
+      detail = await loadDetail(id, preferredType === 'tv' ? 'movie' : 'tv')
+    }
+    return detail
+  }
+
   function getMovieById(id, type = 'movie') {
     const key = `${type}-${id}`
     if (detailCache.value[key]) return detailCache.value[key]
@@ -375,6 +382,7 @@ export const useMediaStore = defineStore('media', () => {
     loadPopular,
     search,
     loadDetail,
+    resolveDetail,
 
     getMovieById,
 

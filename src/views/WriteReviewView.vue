@@ -110,8 +110,7 @@ onMounted(async () => {
     if (!existing) return
     form.rating = existing.rating
     form.body = existing.content ?? ''
-    // Binh: edit flow — type from query or defaults to movie.
-    const mediaType = route.query.type || 'movie'
+    const mediaType = existing.mediaType || route.query.type || 'movie'
     selectedMedia.value = await resolveMedia(existing.mediaId, mediaType)
   }
 })
