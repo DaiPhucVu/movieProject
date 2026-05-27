@@ -75,5 +75,5 @@ model Watchlist {
   mediaId Int
   type    String @default("movie")
 
-  @@unique([userId, mediaId])
+  @@unique([userId, mediaId, type])
 }
