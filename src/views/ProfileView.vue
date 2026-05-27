@@ -119,7 +119,7 @@
               <span class="cl-dim stat-label">Reviews</span>
             </button>
             <button class="stat-item" type="button" @click="activeTab = 'watchlist'">
-              <span class="cl-display stat-val cl-accent">{{ profile.stats.watchlist }}</span>
+              <span class="cl-display stat-val cl-accent">{{ watchlistCount }}</span>
               <span class="cl-dim stat-label">Watchlist</span>
             </button>
             <RouterLink
@@ -170,7 +170,7 @@
             @click="activeTab = 'watchlist'"
           >
             Watchlist
-            <span class="filter-count">{{ profile.stats.watchlist }}</span>
+            <span class="filter-count">{{ watchlistCount }}</span>
           </button>
         </div>
 
@@ -438,6 +438,11 @@ const watchlistMedia = computed(() =>
     .filter(Boolean)
 )
 
+// DB may count stale rows; show only items TMDB still returns.
+const watchlistCount = computed(() =>
+  watchlistLoading.value ? (profile.value?.stats?.watchlist ?? 0) : watchlistMedia.value.length
+)
+
 // Used by reviews tab to show the poster of each reviewed title.
 function getMedia(mediaId, type = 'movie') {
   return mediaStore.getMovieById(mediaId, type)
@@ -527,12 +532,31 @@ async function loadWatchlist() {
       type:    item.type || 'movie',
     }))
 
-    // Hydrate TMDB detail for each item so MediaCard has poster/title/etc.
+    const validItems = []
     await Promise.all(
-      watchlistItems.value.map(item =>
-        mediaStore.loadDetail(item.mediaId, item.type).catch(() => {})
-      )
+      watchlistItems.value.map(async item => {
+        const detail = await mediaStore.loadDetail(item.mediaId, item.type).catch(() => null)
+        if (detail) {
+          validItems.push(item)
+          return
+        }
+        // Remove rows TMDB no longer has (fixes count vs cards mismatch).
+        if (profile.value?.isSelf && auth.token) {
+          await fetch(`${API}/watchlist/toggle`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${auth.token}`,
+            },
+            body: JSON.stringify({ mediaId: item.mediaId, type: item.type }),
+          }).catch(() => {})
+        }
+      })
     )
+    watchlistItems.value = validItems
+    if (profile.value?.stats) {
+      profile.value.stats.watchlist = validItems.length
+    }
   } catch (err) {
     console.error('Watchlist load failed:', err)
     watchlistItems.value = []

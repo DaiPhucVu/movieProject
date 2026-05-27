@@ -197,8 +197,9 @@ const mediaType = computed(() => route.query.type || 'movie')
 // After loadMedia() runs, the title is in the cache.
 const media = computed(() => mediaStore.getMovieById(mediaId.value, mediaType.value))
 
+// Watchlist match needs id + type (TMDB ids overlap for movie vs tv).
 const inWatchlist = computed(() =>
-  media.value ? mediaStore.isInWatchlist(media.value.id) : false
+  media.value ? mediaStore.isInWatchlist(media.value.id, media.value.type) : false
 )
 
 const reviews = computed(() => {
