@@ -57,9 +57,44 @@ function publicUser(u) {
   }
 }
 
-function canViewProfileContent(profileUser, viewerId) {
+async function canViewProfileContent(profileUser, viewerId) {
   if (!profileUser.isPrivate) return true
-  return viewerId === profileUser.id
+  if (!viewerId) return false
+  if (viewerId === profileUser.id) return true
+  const edge = await prisma.follow.findUnique({
+    where: {
+      followerId_followingId: {
+        followerId:  viewerId,
+        followingId: profileUser.id,
+      },
+    },
+  })
+  return !!edge
+}
+
+async function getFollowState(viewerId, targetUserId) {
+  if (!viewerId || viewerId === targetUserId) {
+    return { isFollowing: false, followRequestPending: false }
+  }
+  const [edge, request] = await Promise.all([
+    prisma.follow.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId:  viewerId,
+          followingId: targetUserId,
+        },
+      },
+    }),
+    prisma.followRequest.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId:  viewerId,
+          followingId: targetUserId,
+        },
+      },
+    }),
+  ])
+  return { isFollowing: !!edge, followRequestPending: !!request && !edge }
 }
 
 async function findUserByUsername(username) {
@@ -326,7 +361,7 @@ app.get('/api/users/:username', attachUser, async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' })
 
     const isSelf = req.userId === user.id
-    const canViewContent = canViewProfileContent(user, req.userId)
+    const canViewContent = await canViewProfileContent(user, req.userId)
 
     let stats = { reviews: 0, watchlist: 0, followers: 0, following: 0 }
     if (canViewContent) {
@@ -339,17 +374,23 @@ app.get('/api/users/:username', attachUser, async (req, res) => {
       stats = { reviews: reviewCount, watchlist: watchlistCount, followers: followersCount, following: followingCount }
     }
 
-    let isFollowing = false
-    if (req.userId && !isSelf) {
-      const edge = await prisma.follow.findUnique({
-        where: {
-          followerId_followingId: {
-            followerId:  req.userId,
-            followingId: user.id,
-          },
-        },
+    const { isFollowing, followRequestPending } = await getFollowState(req.userId, user.id)
+
+    let pendingFollowRequests = []
+    if (isSelf) {
+      const requests = await prisma.followRequest.findMany({
+        where:   { followingId: user.id },
+        include: { follower: true },
+        orderBy: { createdAt: 'desc' },
       })
-      isFollowing = !!edge
+      pendingFollowRequests = requests.map(r => ({
+        id:          r.id,
+        followerId:  r.followerId,
+        username:    r.follower.username,
+        displayName: r.follower.displayName,
+        avatar:      r.follower.avatar || null,
+        createdAt:   r.createdAt,
+      }))
     }
 
     res.json({
@@ -360,6 +401,8 @@ app.get('/api/users/:username', attachUser, async (req, res) => {
       },
       stats,
       isFollowing,
+      followRequestPending,
+      pendingFollowRequests,
       isSelf,
       canViewContent,
     })
@@ -412,7 +455,7 @@ app.get('/api/users/:username/reviews', attachUser, async (req, res) => {
   try {
     const user = await findUserByUsername(req.params.username)
     if (!user) return res.status(404).json({ error: 'User not found' })
-    if (!canViewProfileContent(user, req.userId)) {
+    if (!await canViewProfileContent(user, req.userId)) {
       return res.status(403).json({ error: 'This profile is private', private: true, reviews: [] })
     }
     const reviews = await prisma.review.findMany({
@@ -431,7 +474,7 @@ app.get('/api/users/:username/watchlist', attachUser, async (req, res) => {
   try {
     const user = await findUserByUsername(req.params.username)
     if (!user) return res.status(404).json({ error: 'User not found' })
-    if (!canViewProfileContent(user, req.userId)) {
+    if (!await canViewProfileContent(user, req.userId)) {
       return res.status(403).json({ error: 'This profile is private', private: true, watchlist: [] })
     }
     const items = await prisma.watchlist.findMany({
@@ -459,7 +502,7 @@ app.get('/api/users/:username/followers', attachUser, async (req, res) => {
   try {
     const user = await findUserByUsername(req.params.username)
     if (!user) return res.status(404).json({ error: 'User not found' })
-    if (!canViewProfileContent(user, req.userId)) {
+    if (!await canViewProfileContent(user, req.userId)) {
       return res.status(403).json({ error: 'This profile is private', private: true, users: [] })
     }
     const edges = await prisma.follow.findMany({
@@ -479,7 +522,7 @@ app.get('/api/users/:username/following', attachUser, async (req, res) => {
   try {
     const user = await findUserByUsername(req.params.username)
     if (!user) return res.status(404).json({ error: 'User not found' })
-    if (!canViewProfileContent(user, req.userId)) {
+    if (!await canViewProfileContent(user, req.userId)) {
       return res.status(403).json({ error: 'This profile is private', private: true, users: [] })
     }
     const edges = await prisma.follow.findMany({
@@ -503,7 +546,7 @@ app.post('/api/users/:username/follow', authenticate, async (req, res) => {
       return res.status(400).json({ error: "You can't follow yourself" })
     }
 
-    const existing = await prisma.follow.findUnique({
+    const existingFollow = await prisma.follow.findUnique({
       where: {
         followerId_followingId: {
           followerId:  req.userId,
@@ -512,18 +555,82 @@ app.post('/api/users/:username/follow', authenticate, async (req, res) => {
       },
     })
 
-    if (existing) {
-      await prisma.follow.delete({ where: { id: existing.id } })
-      return res.json({ isFollowing: false })
+    if (existingFollow) {
+      await prisma.follow.delete({ where: { id: existingFollow.id } })
+      return res.json({ isFollowing: false, followRequestPending: false })
+    }
+
+    const existingRequest = await prisma.followRequest.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId:  req.userId,
+          followingId: target.id,
+        },
+      },
+    })
+
+    if (existingRequest) {
+      await prisma.followRequest.delete({ where: { id: existingRequest.id } })
+      return res.json({ isFollowing: false, followRequestPending: false })
+    }
+
+    if (target.isPrivate) {
+      await prisma.followRequest.create({
+        data: { followerId: req.userId, followingId: target.id },
+      })
+      return res.json({ isFollowing: false, followRequestPending: true })
     }
 
     await prisma.follow.create({
       data: { followerId: req.userId, followingId: target.id },
     })
-    res.json({ isFollowing: true })
+    res.json({ isFollowing: true, followRequestPending: false })
   } catch (err) {
     console.error('POST /api/users/:username/follow error:', err)
     res.status(500).json({ error: 'Could not update follow status' })
+  }
+})
+
+app.post('/api/users/me/follow-requests/:followerId', authenticate, async (req, res) => {
+  const action = String(req.body?.action || '').toLowerCase()
+  if (action !== 'accept' && action !== 'reject') {
+    return res.status(400).json({ error: 'action must be accept or reject' })
+  }
+
+  try {
+    const followerId = Number(req.params.followerId)
+    const request = await prisma.followRequest.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId,
+          followingId: req.userId,
+        },
+      },
+    })
+
+    if (!request) {
+      return res.status(404).json({ error: 'Follow request not found' })
+    }
+
+    await prisma.followRequest.delete({ where: { id: request.id } })
+
+    if (action === 'accept') {
+      await prisma.follow.upsert({
+        where: {
+          followerId_followingId: {
+            followerId,
+            followingId: req.userId,
+          },
+        },
+        update: {},
+        create: { followerId, followingId: req.userId },
+      })
+    }
+
+    res.json({ success: true, action })
+  } catch (err) {
+    console.error('POST /api/users/me/follow-requests error:', err)
+    res.status(500).json({ error: 'Could not respond to follow request' })
   }
 })
 
