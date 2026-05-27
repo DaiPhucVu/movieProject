@@ -47,11 +47,35 @@ export const useMediaStore = defineStore('media', () => {
   }
 
   //  LOADERS 
+  async function loadReviewStatsForMovies(movieIds = []) {
+    if (!movieIds?.length) return
+
+    const stats = await Promise.all(
+      movieIds.map(async id => {
+        try {
+          const res = await fetch(`${API}/reviews/stats/${id}`)
+          if (!res.ok) return null
+          return await res.json()
+        } catch (err) {
+          console.error('Failed to load review stats for media', id, err)
+          return null
+        }
+      })
+    )
+
+    stats.forEach(stat => {
+      if (!stat) return
+      const movie = movies.value.find(m => Number(m.id) === Number(stat.mediaId))
+      if (movie) movie.reviewCount = stat.count
+    })
+  }
+
   async function loadTrending() {
     loading.value = true
     error.value = ''
     try {
       movies.value = await fetchTrending()
+      await loadReviewStatsForMovies(movies.value.map(m => m.id))
     } catch (e) {
       error.value = 'Failed to load trending titles.'
       console.error(e)
@@ -67,12 +91,14 @@ export const useMediaStore = defineStore('media', () => {
       if (type === 'movie') {
         const data = await fetchPopularMovies(page)
         movies.value = data.results
+        await loadReviewStatsForMovies(movies.value.map(m => m.id))
         return data.totalPages
       }
 
       if (type === 'tv') {
         const data = await fetchPopularTV(page)
         movies.value = data.results
+        await loadReviewStatsForMovies(movies.value.map(m => m.id))
         return data.totalPages
       }
 
@@ -84,6 +110,7 @@ export const useMediaStore = defineStore('media', () => {
       movies.value = [...mv.results, ...tv.results]
         .sort((a, b) => b.rating - a.rating)
 
+      await loadReviewStatsForMovies(movies.value.map(m => m.id))
       return Math.max(mv.totalPages, tv.totalPages)
 
     } catch (e) {
@@ -104,6 +131,7 @@ export const useMediaStore = defineStore('media', () => {
         : await discoverMedia(filters, page)
 
       movies.value = data.results
+      await loadReviewStatsForMovies(movies.value.map(m => m.id))
       return data.totalPages
     } catch (e) {
       error.value = 'Search failed. Please try again.'
