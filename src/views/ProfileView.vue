@@ -70,7 +70,7 @@
                 </div>
                 <p class="cl-dim small mb-0 mt-1">
                   {{ profile.user.isPrivate
-                      ? 'Only you can see your reviews and watchlist.'
+                      ? 'Only approved followers can see your reviews and watchlist.'
                       : 'Anyone can view your profile content.' }}
                 </p>
               </div>
@@ -89,17 +89,19 @@
                   @click="openEdit"
                 >Edit profile</button>
 
-                <!-- Visitor signed in: follow / unfollow -->
+                <!-- Visitor signed in: follow / unfollow / request -->
                 <button
                   v-else-if="auth.isAuthenticated"
                   type="button"
                   class="cl-btn"
-                  :class="profile.isFollowing ? 'cl-btn-ghost' : 'cl-btn-primary'"
+                  :class="profile.isFollowing ? 'cl-btn-ghost' : (profile.followRequestPending ? 'cl-btn-ghost' : 'cl-btn-primary')"
                   :disabled="followLoading"
                   @click="toggleFollow"
                 >
                   <span v-if="followLoading">…</span>
-                  <span v-else>{{ profile.isFollowing ? '✓ Following' : '+ Follow' }}</span>
+                  <span v-else-if="profile.isFollowing">✓ Following</span>
+                  <span v-else-if="profile.followRequestPending">Requested</span>
+                  <span v-else>+ Follow</span>
                 </button>
 
                 <!-- Visitor signed out: prompt to sign in -->
@@ -146,13 +148,53 @@
           <div class="empty-icon mb-3">🔒</div>
           <h2 class="cl-display h4 mb-2">This profile is private</h2>
           <p class="cl-muted mb-0">
-            @{{ profile.user.displayName }} has chosen to keep their reviews and watchlist visible only to themselves.
+            <template v-if="profile.followRequestPending">
+              Your follow request is pending. You'll see {{ profile.user.displayName }}'s reviews and watchlist once they approve.
+            </template>
+            <template v-else-if="auth.isAuthenticated">
+              Follow @{{ profile.user.username }} to request access to their reviews and watchlist.
+            </template>
+            <template v-else>
+              Sign in and follow @{{ profile.user.username }} to request access to their profile.
+            </template>
           </p>
         </div>
       </div>
 
+      <!-- Pending follow requests (owner only) -->
+      <div v-if="profile.canViewContent && profile.isSelf && pendingFollowRequests.length" class="container pt-3">
+        <div class="cl-card follow-requests p-4 mb-2">
+          <h2 class="cl-display h5 mb-3">Follow requests</h2>
+          <div
+            v-for="req in pendingFollowRequests"
+            :key="req.id"
+            class="follow-request-row d-flex align-items-center gap-3 py-2"
+          >
+            <img :src="avatarUrl(req, 48)" :alt="req.displayName" class="request-avatar" />
+            <div class="flex-grow-1 min-w-0">
+              <RouterLink :to="`/profile/${req.username}`" class="request-name">{{ req.displayName }}</RouterLink>
+              <p class="cl-dim small mb-0">@{{ req.username }}</p>
+            </div>
+            <div class="d-flex gap-2 flex-shrink-0">
+              <button
+                type="button"
+                class="cl-btn cl-btn-primary cl-btn-sm"
+                :disabled="requestLoadingId === req.followerId"
+                @click="respondFollowRequest(req.followerId, 'accept')"
+              >Accept</button>
+              <button
+                type="button"
+                class="cl-btn cl-btn-ghost cl-btn-sm"
+                :disabled="requestLoadingId === req.followerId"
+                @click="respondFollowRequest(req.followerId, 'reject')"
+              >Decline</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Tabs -->
-      <div v-else class="container py-4">
+      <div v-if="profile.canViewContent" class="container py-4">
         <div class="filter-tabs mb-4" role="tablist">
           <button
             type="button"
@@ -355,7 +397,7 @@
                   >Private</button>
                 </div>
                 <p class="cl-dim small mt-1 mb-0">
-                  Private hides your reviews, watchlist, and connections from other users.
+                  Private profiles require follow approval before others can view your content.
                 </p>
               </div>
 
@@ -391,6 +433,10 @@ const route = useRoute()
 const auth  = useAuthStore()
 const mediaStore = useMediaStore()
 
+function profileAuthHeaders() {
+  return auth.token ? { Authorization: `Bearer ${auth.token}` } : {}
+}
+
 // ── State ───────────────────────────────────────────────────────────
 // profile holds the response of GET /api/users/:username — user + stats
 // + isFollowing/isSelf flags. Null while the page is fetching or 404.
@@ -404,6 +450,8 @@ const watchlistLoading = ref(false)
 
 const activeTab    = ref(route.query.tab === 'watchlist' ? 'watchlist' : 'reviews')
 const followLoading = ref(false)
+const pendingFollowRequests = ref([])
+const requestLoadingId = ref(null)
 
 // Edit-profile modal state
 const editing    = ref(false)
@@ -458,8 +506,9 @@ function getMedia(mediaId, type = 'movie') {
 async function loadProfile() {
   loading.value = true
   try {
-    const headers = auth.token ? { Authorization: `Bearer ${auth.token}` } : {}
-    const res = await fetch(`${API}/users/${route.params.username}`, { headers })
+    const res = await fetch(`${API}/users/${route.params.username}`, {
+      headers: profileAuthHeaders(),
+    })
 
     if (!res.ok) {
       profile.value = null
@@ -468,6 +517,7 @@ async function loadProfile() {
 
     const data = await res.json()
     profile.value = data
+    pendingFollowRequests.value = data.pendingFollowRequests || []
   } catch (err) {
     console.error('Profile load failed:', err)
     profile.value = null
@@ -483,8 +533,14 @@ async function loadReviews() {
   }
   reviewsLoading.value = true
   try {
-    const res = await fetch(`${API}/users/${profile.value.user.username}/reviews`)
+    const res = await fetch(`${API}/users/${profile.value.user.username}/reviews`, {
+      headers: profileAuthHeaders(),
+    })
     const data = await res.json()
+    if (!res.ok) {
+      reviews.value = []
+      return
+    }
     reviews.value = data.reviews || []
 
     // Hydrate TMDB detail for each reviewed title so we can show its poster.
@@ -548,8 +604,14 @@ async function loadWatchlist() {
   }
   watchlistLoading.value = true
   try {
-    const res = await fetch(`${API}/users/${profile.value.user.username}/watchlist`)
+    const res = await fetch(`${API}/users/${profile.value.user.username}/watchlist`, {
+      headers: profileAuthHeaders(),
+    })
     const data = await res.json()
+    if (!res.ok) {
+      watchlistItems.value = []
+      return
+    }
     watchlistItems.value = (data.watchlist || []).map(item => ({
       mediaId: Number(item.mediaId),
       type:    item.type || 'movie',
@@ -579,6 +641,7 @@ async function removeFromWatchlist(media) {
 async function toggleFollow() {
   if (!auth.isAuthenticated || !profile.value || profile.value.isSelf) return
   followLoading.value = true
+  const wasFollowing = profile.value.isFollowing
   try {
     const res = await fetch(`${API}/users/${profile.value.user.username}/follow`, {
       method:  'POST',
@@ -589,12 +652,53 @@ async function toggleFollow() {
       alert(data.error || 'Could not update follow.')
       return
     }
-    profile.value.isFollowing = data.isFollowing
-    profile.value.stats.followers += data.isFollowing ? 1 : -1
+    profile.value.isFollowing = !!data.isFollowing
+    profile.value.followRequestPending = !!data.followRequestPending
+
+    if (wasFollowing && !data.isFollowing) {
+      profile.value.stats.followers = Math.max(0, profile.value.stats.followers - 1)
+      if (profile.value.user.isPrivate) {
+        profile.value.canViewContent = false
+        reviews.value = []
+        watchlistItems.value = []
+      }
+    } else if (!wasFollowing && data.isFollowing) {
+      profile.value.stats.followers += 1
+      profile.value.canViewContent = true
+      await Promise.all([loadReviews(), loadWatchlist()])
+    }
   } catch (err) {
     console.error('Follow toggle failed:', err)
   } finally {
     followLoading.value = false
+  }
+}
+
+async function respondFollowRequest(followerId, action) {
+  if (!profile.value?.isSelf || !auth.token) return
+  requestLoadingId.value = followerId
+  try {
+    const res = await fetch(`${API}/users/me/follow-requests/${followerId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${auth.token}`,
+      },
+      body: JSON.stringify({ action }),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      alert(data.error || 'Could not update follow request.')
+      return
+    }
+    pendingFollowRequests.value = pendingFollowRequests.value.filter(r => r.followerId !== followerId)
+    if (action === 'accept') {
+      profile.value.stats.followers += 1
+    }
+  } catch (err) {
+    console.error('Follow request response failed:', err)
+  } finally {
+    requestLoadingId.value = null
   }
 }
 
@@ -921,6 +1025,28 @@ watch(
   background: #c0392b;
   color: #fff;
   border-color: #c0392b;
+}
+
+.follow-requests {
+  border-style: solid;
+}
+.follow-request-row + .follow-request-row {
+  border-top: 1px solid var(--cl-border);
+}
+.request-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--cl-border);
+}
+.request-name {
+  color: var(--cl-text);
+  text-decoration: none;
+  font-weight: 500;
+}
+.request-name:hover {
+  color: var(--cl-accent);
 }
 
 /* -- 404 -- */

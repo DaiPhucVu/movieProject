@@ -21,12 +21,14 @@
       v-if="canFollow && !isSelf"
       type="button"
       class="cl-btn cl-btn-sm flex-shrink-0"
-      :class="user.isFollowing ? 'cl-btn-ghost' : 'cl-btn-primary'"
+      :class="user.isFollowing ? 'cl-btn-ghost' : (user.followRequestPending ? 'cl-btn-ghost' : 'cl-btn-primary')"
       :disabled="pending"
       @click="$emit('toggle', user)"
     >
       <span v-if="pending">…</span>
-      <span v-else>{{ user.isFollowing ? '✓ Following' : '+ Follow' }}</span>
+      <span v-else-if="user.isFollowing">✓ Following</span>
+      <span v-else-if="user.followRequestPending">Requested</span>
+      <span v-else>+ Follow</span>
     </button>
     <span
       v-else-if="isSelf"

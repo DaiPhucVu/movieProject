@@ -329,7 +329,10 @@ async function toggleFollow(user) {
     }
 
     // Flip the flag everywhere this user appears.
-    updateUserEverywhere(user.id, { isFollowing: data.isFollowing })
+    updateUserEverywhere(user.id, {
+      isFollowing: !!data.isFollowing,
+      followRequestPending: !!data.followRequestPending,
+    })
   } catch (err) {
     console.error('Follow toggle failed:', err)
   } finally {
