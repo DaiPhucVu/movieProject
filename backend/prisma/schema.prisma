@@ -67,6 +67,7 @@ model Review {
   user      User     @relation(fields: [userId], references: [id])
   userId    Int
   mediaId   Int
+  mediaType String   @default("movie")
 }
 
 model Watchlist {
@@ -75,5 +76,5 @@ model Watchlist {
   mediaId Int
   type    String @default("movie")
 
-  @@unique([userId, mediaId, type])
+  @@unique([userId, mediaId])
 }

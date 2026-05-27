@@ -149,8 +149,12 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/reviews', async (req, res) => {
   try {
     const mediaId = req.query.mediaId ? Number(req.query.mediaId) : undefined
+    const mediaType = req.query.mediaType ? String(req.query.mediaType) : undefined
+    const where = {}
+    if (mediaId) where.mediaId = mediaId
+    if (mediaType) where.mediaType = mediaType
     const reviews = await prisma.review.findMany({
-      where: mediaId ? { mediaId } : {},
+      where,
       include: { user: true },
       orderBy: { createdAt: 'desc' },
     })
@@ -163,17 +167,19 @@ app.get('/api/reviews', async (req, res) => {
 
 app.post('/api/reviews', authenticate, async (req, res) => {
   try {
-    const { mediaId, rating, content } = req.body
+    const { mediaId, mediaType, rating, content } = req.body
     if (!mediaId || !rating || !content) {
       return res.status(400).json({ error: 'Missing required fields' })
     }
     const review = await prisma.review.create({
       data: {
         mediaId: Number(mediaId),
+        mediaType: mediaType === 'tv' ? 'tv' : 'movie',
         rating,
         content,
         userId: req.userId,
       },
+      include: { user: true },
     })
     res.status(201).json({ review })
   } catch (err) {
@@ -267,7 +273,7 @@ app.post('/api/watchlist/toggle', authenticate, async (req, res) => {
     const numericId = Number(mediaId)
 
     const existing = await prisma.watchlist.findFirst({
-      where: { userId: req.userId, mediaId: numericId, type: mediaType },
+      where: { userId: req.userId, mediaId: numericId },
     })
 
     if (existing) {
