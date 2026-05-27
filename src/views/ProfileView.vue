@@ -119,7 +119,7 @@
               <span class="cl-dim stat-label">Reviews</span>
             </button>
             <button class="stat-item" type="button" @click="activeTab = 'watchlist'">
-              <span class="cl-display stat-val cl-accent">{{ watchlistCount }}</span>
+              <span class="cl-display stat-val cl-accent">{{ profile.stats.watchlist }}</span>
               <span class="cl-dim stat-label">Watchlist</span>
             </button>
             <RouterLink
@@ -170,7 +170,7 @@
             @click="activeTab = 'watchlist'"
           >
             Watchlist
-            <span class="filter-count">{{ watchlistCount }}</span>
+            <span class="filter-count">{{ profile.stats.watchlist }}</span>
           </button>
         </div>
 
@@ -196,16 +196,16 @@
           <div v-else class="row g-3">
             <div v-for="r in reviews" :key="r.id" class="col-12 col-md-6">
               <div class="cl-card p-3 h-100">
-                <ReviewCard :review="r" @delete="handleDeleteReview" />
+                <ReviewCard :review="r" @delete="handleDeleteReview" @like="handleLikeReview" />
                 <RouterLink
-                  v-if="getMedia(r.mediaId, r.mediaType)"
-                  :to="{ name: 'MediaDetail', params: { id: r.mediaId }, query: { type: getMedia(r.mediaId, r.mediaType)?.type || r.mediaType || 'movie' } }"
+                  v-if="getMedia(r.mediaId)"
+                  :to="{ name: 'MediaDetail', params: { id: r.mediaId }, query: { type: getMedia(r.mediaId)?.type || 'movie' } }"
                   class="reviewed-media mt-3"
                 >
-                  <img :src="getMedia(r.mediaId, r.mediaType)?.poster" :alt="getMedia(r.mediaId, r.mediaType)?.title" />
+                  <img :src="getMedia(r.mediaId)?.poster" :alt="getMedia(r.mediaId)?.title" />
                   <div>
-                    <p class="reviewed-title mb-0">{{ getMedia(r.mediaId, r.mediaType)?.title }}</p>
-                    <p class="cl-dim small mb-0">{{ getMedia(r.mediaId, r.mediaType)?.year }}</p>
+                    <p class="reviewed-title mb-0">{{ getMedia(r.mediaId)?.title }}</p>
+                    <p class="cl-dim small mb-0">{{ getMedia(r.mediaId)?.year }}</p>
                   </div>
                 </RouterLink>
               </div>
@@ -438,15 +438,9 @@ const watchlistMedia = computed(() =>
     .filter(Boolean)
 )
 
-// DB may count stale rows; show only items TMDB still returns.
-const watchlistCount = computed(() =>
-  watchlistLoading.value ? (profile.value?.stats?.watchlist ?? 0) : watchlistMedia.value.length
-)
-
 // Used by reviews tab to show the poster of each reviewed title.
 function getMedia(mediaId, type = 'movie') {
   return mediaStore.getMovieById(mediaId, type)
-    || mediaStore.getMovieById(mediaId, type === 'tv' ? 'movie' : 'tv')
 }
 
 // ── Data loading ────────────────────────────────────────────────────
@@ -486,7 +480,7 @@ async function loadReviews() {
     // Errors are caught per-item so one bad fetch doesn't kill the list.
     await Promise.all(
       reviews.value.map(r =>
-        mediaStore.resolveDetail(r.mediaId, r.mediaType || 'movie').catch(() => {})
+        mediaStore.loadDetail(r.mediaId, 'movie').catch(() => {})
       )
     )
   } catch (err) {
@@ -519,6 +513,23 @@ async function handleDeleteReview(reviewId) {
   }
 }
 
+function handleLikeReview(reviewId) {
+  if (!auth.isAuthenticated) return
+  const review = reviews.value.find(r => r.id === Number(reviewId))
+  if (!review) return
+  if (!review._likedBy) review._likedBy = []
+  const alreadyLiked = review._likedBy.includes(auth.user.id)
+  if (alreadyLiked) {
+    review._likedBy = review._likedBy.filter(id => id !== auth.user.id)
+    review.likes = Math.max(0, (review.likes || 0) - 1)
+    review.liked = false
+  } else {
+    review._likedBy.push(auth.user.id)
+    review.likes = (review.likes || 0) + 1
+    review.liked = true
+  }
+}
+
 async function loadWatchlist() {
   if (!profile.value?.canViewContent) {
     watchlistItems.value = []
@@ -533,31 +544,12 @@ async function loadWatchlist() {
       type:    item.type || 'movie',
     }))
 
-    const validItems = []
+    // Hydrate TMDB detail for each item so MediaCard has poster/title/etc.
     await Promise.all(
-      watchlistItems.value.map(async item => {
-        const detail = await mediaStore.loadDetail(item.mediaId, item.type).catch(() => null)
-        if (detail) {
-          validItems.push(item)
-          return
-        }
-        // Remove rows TMDB no longer has (fixes count vs cards mismatch).
-        if (profile.value?.isSelf && auth.token) {
-          await fetch(`${API}/watchlist/toggle`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${auth.token}`,
-            },
-            body: JSON.stringify({ mediaId: item.mediaId, type: item.type || 'movie' }),
-          }).catch(() => {})
-        }
-      })
+      watchlistItems.value.map(item =>
+        mediaStore.loadDetail(item.mediaId, item.type).catch(() => {})
+      )
     )
-    watchlistItems.value = validItems
-    if (profile.value?.stats) {
-      profile.value.stats.watchlist = validItems.length
-    }
   } catch (err) {
     console.error('Watchlist load failed:', err)
     watchlistItems.value = []
