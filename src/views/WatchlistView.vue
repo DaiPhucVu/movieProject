@@ -191,6 +191,7 @@ watch(totalPages, (newTotal) => {
 // 1. Fetch the user's watchlist (array of {mediaId, type} from backend)
 // 2. For each item, ask the store to load its TMDB detail into the cache
 //    (loadDetail caches in detailCache, getMovieById reads from there)
+// 3. Load review stats for all watchlist items
 async function loadWatchlist() {
   if (!auth.isAuthenticated || !auth.user?.id) return
   loading.value = true
@@ -205,6 +206,11 @@ async function loadWatchlist() {
           console.warn(`Could not load detail for ${item.type}/${item.mediaId}:`, err)
         })
       )
+    )
+
+    // Load review stats for all watchlist items
+    await mediaStore.loadReviewStatsForMovies(
+      mediaStore.watchlist.map(item => item.mediaId)
     )
   } catch (err) {
     console.error('Watchlist load failed:', err)

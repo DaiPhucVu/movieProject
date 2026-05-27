@@ -65,11 +65,21 @@ export const useMediaStore = defineStore('media', () => {
 
     stats.forEach(stat => {
       if (!stat) return
+      
+      // Update in movies.value
       const movie = movies.value.find(m => Number(m.id) === Number(stat.mediaId))
       if (movie) {
         movie.reviewCount = stat.count
         movie.reviewAverage = stat.averageRating
       }
+      
+      // Update in detailCache (important for watchlist, search, etc)
+      Object.values(detailCache.value).forEach(cached => {
+        if (Number(cached.id) === Number(stat.mediaId)) {
+          cached.reviewCount = stat.count
+          cached.reviewAverage = stat.averageRating
+        }
+      })
     })
   }
 
@@ -397,6 +407,7 @@ export const useMediaStore = defineStore('media', () => {
     loadPopular,
     search,
     loadDetail,
+    loadReviewStatsForMovies,
 
     getMovieById,
 
