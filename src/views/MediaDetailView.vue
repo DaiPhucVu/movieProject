@@ -19,22 +19,20 @@
             <!-- Action buttons -->
             <div class="d-flex flex-column gap-2 mt-3">
               <template v-if="auth.isAuthenticated">
-                <!-- Binh: watchlist needs media.type — TMDB ids are not unique across movie/tv. -->
                 <button
                   class="cl-btn cl-btn-primary w-100"
                   @click="mediaStore.toggleWatchlist(media.id, media.type)"
                 >
                   {{ inWatchlist ? '✓ In Watchlist' : '+ Add to Watchlist' }}
                 </button>
-                <!-- Binh: carry ?type= to Write Review so the right show/film loads. -->
                 <RouterLink
                   v-if="!hasUserReviewed"
-                  :to="{ path: `/review/new/${media.id}`, query: { type: media.type || 'movie' } }"
+                  :to="`/review/new/${media.id}?type=${media.type || 'movie'}`"
                   class="cl-btn cl-btn-ghost w-100"
                 >✍ Write a Review</RouterLink>
                 <RouterLink
                   v-else
-                  :to="{ path: `/review/edit/${userReview.id}`, query: { type: media.type || 'movie' } }"
+                  :to="`/review/edit/${userReview.id}`"
                   class="cl-btn cl-btn-ghost w-100"
                 >✍ Edit Your Review</RouterLink>
               </template>
@@ -64,12 +62,8 @@
             <div class="d-flex align-items-center gap-3 flex-wrap mb-3">
               <div class="d-flex align-items-baseline gap-1">
                 <span class="cl-accent">★</span>
-                <span class="rating-value cl-accent">{{ combinedRating }}</span>
+                <span class="rating-value cl-accent">{{ displayRating }}</span>
                 <span class="cl-dim small">/10</span>
-              </div>
-              <div class="d-flex gap-2 flex-wrap align-items-center">
-                <span class="cl-muted small">TMDB: {{ apiRatingDisplay }}/10</span>
-                <span v-if="reviewRatingDisplay" class="cl-muted small">Reviews: {{ reviewRatingDisplay }}/10</span>
               </div>
               <span class="cl-muted small">
                 {{ reviews.length }} {{ reviews.length === 1 ? 'review' : 'reviews' }}
@@ -125,10 +119,9 @@
         <div v-else-if="reviews.length === 0" class="empty-state cl-card p-5 text-center">
           <h3 class="cl-display h4 mb-2">No reviews yet</h3>
           <p class="cl-muted mb-4">Be the first to share your thoughts on {{ media.title }}.</p>
-          <!-- Binh: same ?type= on review + login redirect links (see hero buttons). -->
           <RouterLink
             v-if="auth.isAuthenticated"
-            :to="{ path: `/review/new/${media.id}`, query: { type: media.type || 'movie' } }"
+            :to="`/review/new/${media.id}?type=${media.type || 'movie'}`"
             class="cl-btn cl-btn-primary"
           >Write the first review</RouterLink>
           <RouterLink
@@ -143,7 +136,7 @@
           <div class="row g-3">
             <div v-for="r in pagedReviews" :key="r.id" class="col-12">
               <div class="cl-card p-3">
-                <ReviewCard :review="r" @delete="handleDelete" />
+                <ReviewCard :review="r" @delete="handleDelete" @like="handleLike" />
               </div>
             </div>
           </div>
@@ -194,7 +187,6 @@ const loadingMedia = ref(true)
 
 // The route param is the TMDB id; the query param tells us movie vs tv.
 const mediaId = computed(() => Number(route.params.id))
-// Binh: read movie vs tv from URL — required when ids collide on TMDB.
 const mediaType = computed(() => route.query.type || 'movie')
 
 // getMovieById checks detailCache first (populated by loadDetail), then movies.
@@ -205,10 +197,9 @@ const inWatchlist = computed(() =>
   media.value ? mediaStore.isInWatchlist(media.value.id) : false
 )
 
-// Binh: filter reviews by mediaType so movie/tv with same id stay separate.
 const reviews = computed(() => {
   if (!media.value) return []
-  return mediaStore.getReviewsByMediaId(media.value.id, media.value.type)
+  return mediaStore.getReviewsByMediaId(media.value.id)
 })
 
 const userReview = computed(() => {
@@ -217,23 +208,11 @@ const userReview = computed(() => {
 })
 const hasUserReviewed = computed(() => userReview.value !== null)
 
-const apiRating = computed(() => media.value?.rating ?? null)
-const apiRatingDisplay = computed(() => apiRating.value !== null ? apiRating.value.toFixed(1) : '–')
-
-const reviewRating = computed(() => {
-  if (reviews.value.length === 0) return null
+// Show the local average if we have reviews, otherwise fall back to TMDB's rating.
+const displayRating = computed(() => {
+  if (reviews.value.length === 0) return media.value?.rating?.toFixed(1) ?? '–'
   const sum = reviews.value.reduce((acc, r) => acc + r.rating, 0)
-  return sum / reviews.value.length
-})
-const reviewRatingDisplay = computed(() =>
-  reviewRating.value !== null ? reviewRating.value.toFixed(1) : null
-)
-
-const combinedRating = computed(() => {
-  if (apiRating.value === null) return '–'
-  if (reviewRating.value === null) return apiRating.value.toFixed(1)
-  const combined = apiRating.value * 0.7 + reviewRating.value * 0.3
-  return combined.toFixed(1)
+  return (sum / reviews.value.length).toFixed(1)
 })
 
 const sortedReviews = computed(() => {
@@ -294,7 +273,7 @@ async function loadMedia() {
 async function loadReviews() {
   loadingReviews.value = true
   try {
-    await mediaStore.fetchReviewsByMediaId(mediaId.value, mediaType.value)
+    await mediaStore.fetchReviewsByMediaId(mediaId.value)
   } catch (err) {
     console.error('Could not load reviews:', err)
   } finally {
@@ -316,6 +295,11 @@ watch([mediaId, mediaType], async () => {
 // ── Actions ──
 // Note: the store no longer exposes deleteReview, so we call the backend
 // directly here. Same pattern as toggleWatchlist or addReview internally.
+function handleLike(reviewId) {
+  if (!auth.isAuthenticated) return
+  mediaStore.toggleReviewLike(reviewId, auth.user.id)
+}
+
 async function handleDelete(reviewId) {
   if (!auth.user?.id) return
   if (!confirm('Delete this review? This cannot be undone.')) return
