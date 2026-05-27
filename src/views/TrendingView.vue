@@ -140,7 +140,7 @@
                   <div class="d-flex flex-wrap gap-2 mb-4">
 
                     <span class="badge bg-secondary px-3 py-2 fs-6">
-                      ★ {{ (media.rating || 0).toFixed(1) }}
+                      ★ {{ (media.combinedRating || 0).toFixed(1) }}
                     </span>
 
                     <span class="badge bg-secondary px-3 py-2 fs-6">
@@ -238,8 +238,16 @@ const normalizedMovies = computed(() => {
 
     reviewCount:
       m.reviewCount ||
-      m.vote_count ||
-      0
+      0,
+
+    reviewAverage:
+      m.reviewAverage ||
+      0,
+
+    combinedRating:
+      m.reviewAverage
+        ? ((m.rating || 0) * 0.7 + m.reviewAverage * 0.3)
+        : (m.rating || 0)
   }))
 })
 
@@ -264,8 +272,8 @@ const sortedMovies = computed(() => {
     }
 
     return order * (
-      (a.rating || 0) -
-      (b.rating || 0)
+      (a.combinedRating || 0) -
+      (b.combinedRating || 0)
     )
   })
 })
