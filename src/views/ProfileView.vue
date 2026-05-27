@@ -235,10 +235,19 @@
           <div v-else class="row g-3">
             <div
               v-for="m in watchlistMedia"
-              :key="m.id"
+              :key="`${m.type}-${m.id}`"
               class="col-6 col-md-4 col-lg-3 col-xl-2"
             >
-              <MediaCard :media="m" :show-watchlist="profile.isSelf" />
+              <div class="profile-watchlist-card">
+                <button
+                  v-if="profile.isSelf"
+                  type="button"
+                  class="watchlist-remove-btn"
+                  aria-label="Remove from watchlist"
+                  @click="removeFromWatchlist(m)"
+                >×</button>
+                <MediaCard :media="m" :show-watchlist="false" />
+              </div>
             </div>
           </div>
         </section>
@@ -560,6 +569,12 @@ async function loadWatchlist() {
   }
 }
 
+async function removeFromWatchlist(media) {
+  if (!profile.value?.isSelf || !auth.isAuthenticated) return
+  await mediaStore.toggleWatchlist(media.id, media.type || 'movie')
+  watchlistItems.value = watchlistItems.value.filter(item => item.mediaId !== media.id)
+}
+
 // ── Actions ─────────────────────────────────────────────────────────
 async function toggleFollow() {
   if (!auth.isAuthenticated || !profile.value || profile.value.isSelf) return
@@ -877,6 +892,36 @@ watch(
   display: inline-flex;
 }
 .empty-icon { font-size: 3rem; opacity: 0.6; }
+
+.profile-watchlist-card {
+  position: relative;
+}
+.watchlist-remove-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.75);
+  color: var(--cl-text);
+  font-size: 1.2rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  backdrop-filter: blur(4px);
+  transition: background var(--cl-transition), color var(--cl-transition);
+}
+.watchlist-remove-btn:hover {
+  background: #c0392b;
+  color: #fff;
+  border-color: #c0392b;
+}
 
 /* -- 404 -- */
 .nf-title {
