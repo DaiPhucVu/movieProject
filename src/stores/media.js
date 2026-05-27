@@ -66,7 +66,10 @@ export const useMediaStore = defineStore('media', () => {
     stats.forEach(stat => {
       if (!stat) return
       const movie = movies.value.find(m => Number(m.id) === Number(stat.mediaId))
-      if (movie) movie.reviewCount = stat.count
+      if (movie) {
+        movie.reviewCount = stat.count
+        movie.reviewAverage = stat.averageRating
+      }
     })
   }
 
@@ -224,7 +227,17 @@ export const useMediaStore = defineStore('media', () => {
         m => m.id === Number(reviewData.mediaId)
       )
 
-      if (movie) movie.reviewCount++
+      if (movie) {
+        const oldCount = Number(movie.reviewCount || 0)
+        movie.reviewCount = oldCount + 1
+        if (typeof movie.reviewAverage === 'number' && oldCount > 0) {
+          movie.reviewAverage = (
+            (movie.reviewAverage * oldCount) + Number(reviewData.rating)
+          ) / (oldCount + 1)
+        } else {
+          movie.reviewAverage = Number(reviewData.rating)
+        }
+      }
 
       return { success: true, review: data.review }
 
