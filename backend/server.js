@@ -263,8 +263,11 @@ app.post('/api/watchlist/toggle', authenticate, async (req, res) => {
     const { mediaId, type } = req.body
     if (!mediaId) return res.status(400).json({ error: 'Missing mediaId' })
 
+    const mediaType = type || 'movie'
+    const numericId = Number(mediaId)
+
     const existing = await prisma.watchlist.findFirst({
-      where: { userId: req.userId, mediaId: Number(mediaId) },
+      where: { userId: req.userId, mediaId: numericId, type: mediaType },
     })
 
     if (existing) {
@@ -273,7 +276,7 @@ app.post('/api/watchlist/toggle', authenticate, async (req, res) => {
     }
 
     await prisma.watchlist.create({
-      data: { userId: req.userId, mediaId: Number(mediaId), type: type || 'movie' },
+      data: { userId: req.userId, mediaId: numericId, type: mediaType },
     })
     return res.json({ saved: true })
   } catch (err) {

@@ -168,17 +168,12 @@ export const useMediaStore = defineStore('media', () => {
     }
   }
 
-  //  HELPERS 
+  // Cache key is type-id; same numeric id can be a different movie vs tv on TMDB.
   function getMovieById(id, type = 'movie') {
     const key = `${type}-${id}`
     if (detailCache.value[key]) return detailCache.value[key]
 
-    const cached = Object.values(detailCache.value)
-      .find(d => d.id === Number(id) && (!type || d.type === type))
-
-    if (cached) return cached
-
-    return movies.value.find(m => m.id === Number(id) && (!type || m.type === type))
+    return movies.value.find(m => m.id === Number(id) && m.type === type)
   }
 
   //  REVIEWS 
@@ -293,12 +288,14 @@ export const useMediaStore = defineStore('media', () => {
     }
   }
 
-  //  WATCHLIST 
+  //  WATCHLIST — always use { mediaId, type }; ids are not unique across movie/tv.
 
-  function isInWatchlist(mediaId) {
-    return watchlist.value.some(
-      item => Number(item.mediaId) === Number(mediaId)
-    )
+  function isInWatchlist(mediaId, mediaType = null) {
+    return watchlist.value.some(item => {
+      if (Number(item.mediaId) !== Number(mediaId)) return false
+      if (mediaType && item.type !== mediaType) return false
+      return true
+    })
   }
 
   async function fetchWatchlist(userId) {
@@ -329,13 +326,13 @@ export const useMediaStore = defineStore('media', () => {
           'Content-Type': 'application/json',
           ...authHeaders()
         },
-        body: JSON.stringify({ mediaId })
+        body: JSON.stringify({ mediaId, type: mediaType })
       })
 
       const data = await res.json()
 
       if (data.saved) {
-        if (!isInWatchlist(mediaId)) {
+        if (!isInWatchlist(mediaId, mediaType)) {
           watchlist.value.push({
             mediaId: Number(mediaId),
             type: mediaType
@@ -343,7 +340,7 @@ export const useMediaStore = defineStore('media', () => {
         }
       } else {
         watchlist.value = watchlist.value.filter(
-          item => Number(item.mediaId) !== Number(mediaId)
+          item => !(Number(item.mediaId) === Number(mediaId) && item.type === mediaType)
         )
       }
 

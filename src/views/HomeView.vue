@@ -36,12 +36,13 @@
           >
             View Details
           </RouterLink>
+          <!-- Include type in watchlist check — TMDB ids overlap between movie and tv. -->
           <button
             v-if="auth.isAuthenticated"
             class="btn btn-outline-light"
             @click="mediaStore.toggleWatchlist(featured.id, featured.type)"
           >
-            {{ mediaStore.isInWatchlist(featured.id) ? '✓ In Watchlist' : '+ Watchlist' }}
+            {{ mediaStore.isInWatchlist(featured.id, featured.type) ? '✓ In Watchlist' : '+ Watchlist' }}
           </button>
         </div>
       </div>
