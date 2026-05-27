@@ -19,7 +19,10 @@
         <span>♥</span> {{ review.likes }}
       </button>
       <div v-if="canEdit" class="review-actions">
-        <RouterLink :to="`/review/edit/${review.id}`" class="action-btn edit-btn">Edit</RouterLink>
+        <RouterLink
+          :to="{ path: `/review/edit/${review.id}`, query: { type: review.mediaType || 'movie' } }"
+          class="action-btn edit-btn"
+        >Edit</RouterLink>
         <button class="action-btn delete-btn" @click="$emit('delete', review.id)">Delete</button>
       </div>
     </div>

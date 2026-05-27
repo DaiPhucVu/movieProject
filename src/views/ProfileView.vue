@@ -198,14 +198,14 @@
               <div class="cl-card p-3 h-100">
                 <ReviewCard :review="r" @delete="handleDeleteReview" />
                 <RouterLink
-                  v-if="getMedia(r.mediaId)"
-                  :to="{ name: 'MediaDetail', params: { id: r.mediaId }, query: { type: getMedia(r.mediaId)?.type || 'movie' } }"
+                  v-if="getMedia(r.mediaId, r.mediaType)"
+                  :to="{ name: 'MediaDetail', params: { id: r.mediaId }, query: { type: getMedia(r.mediaId, r.mediaType)?.type || r.mediaType || 'movie' } }"
                   class="reviewed-media mt-3"
                 >
-                  <img :src="getMedia(r.mediaId)?.poster" :alt="getMedia(r.mediaId)?.title" />
+                  <img :src="getMedia(r.mediaId, r.mediaType)?.poster" :alt="getMedia(r.mediaId, r.mediaType)?.title" />
                   <div>
-                    <p class="reviewed-title mb-0">{{ getMedia(r.mediaId)?.title }}</p>
-                    <p class="cl-dim small mb-0">{{ getMedia(r.mediaId)?.year }}</p>
+                    <p class="reviewed-title mb-0">{{ getMedia(r.mediaId, r.mediaType)?.title }}</p>
+                    <p class="cl-dim small mb-0">{{ getMedia(r.mediaId, r.mediaType)?.year }}</p>
                   </div>
                 </RouterLink>
               </div>
@@ -446,6 +446,7 @@ const watchlistCount = computed(() =>
 // Used by reviews tab to show the poster of each reviewed title.
 function getMedia(mediaId, type = 'movie') {
   return mediaStore.getMovieById(mediaId, type)
+    || mediaStore.getMovieById(mediaId, type === 'tv' ? 'movie' : 'tv')
 }
 
 // ── Data loading ────────────────────────────────────────────────────
@@ -485,7 +486,7 @@ async function loadReviews() {
     // Errors are caught per-item so one bad fetch doesn't kill the list.
     await Promise.all(
       reviews.value.map(r =>
-        mediaStore.loadDetail(r.mediaId, 'movie').catch(() => {})
+        mediaStore.resolveDetail(r.mediaId, r.mediaType || 'movie').catch(() => {})
       )
     )
   } catch (err) {
@@ -548,7 +549,7 @@ async function loadWatchlist() {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${auth.token}`,
             },
-            body: JSON.stringify({ mediaId: item.mediaId, type: item.type }),
+            body: JSON.stringify({ mediaId: item.mediaId, type: item.type || 'movie' }),
           }).catch(() => {})
         }
       })

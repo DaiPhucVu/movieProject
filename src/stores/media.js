@@ -65,14 +65,13 @@ export const useMediaStore = defineStore('media', () => {
 
     stats.forEach(stat => {
       if (!stat) return
-      
-      // Update in movies.value
+
       const movie = movies.value.find(m => Number(m.id) === Number(stat.mediaId))
       if (movie) {
         movie.reviewCount = stat.count
         movie.reviewAverage = stat.averageRating
       }
-      
+
       // Update in detailCache (important for watchlist, search, etc)
       Object.values(detailCache.value).forEach(cached => {
         if (Number(cached.id) === Number(stat.mediaId)) {
@@ -81,6 +80,16 @@ export const useMediaStore = defineStore('media', () => {
         }
       })
     })
+  }
+
+  // Try preferred TMDB type first, then the other (ids overlap for movie vs tv).
+  async function resolveDetail(id, preferredType = 'movie') {
+    let detail = await loadDetail(id, preferredType)
+    if (!detail) {
+      const alt = preferredType === 'tv' ? 'movie' : 'tv'
+      detail = await loadDetail(id, alt)
+    }
+    return detail
   }
 
   async function loadTrending() {
@@ -187,14 +196,20 @@ export const useMediaStore = defineStore('media', () => {
   }
 
   //  REVIEWS 
-  async function fetchReviewsByMediaId(mediaId) {
+  async function fetchReviewsByMediaId(mediaId, mediaType = null) {
     try {
-      const res = await fetch(`${API}/reviews?mediaId=${mediaId}`)
+      const params = new URLSearchParams({ mediaId: String(mediaId) })
+      if (mediaType) params.set('mediaType', mediaType)
+      const res = await fetch(`${API}/reviews?${params}`)
       const data = await res.json()
 
       if (res.ok) {
         reviews.value = [
-          ...reviews.value.filter(r => r.mediaId !== Number(mediaId)),
+          ...reviews.value.filter(r => {
+            if (Number(r.mediaId) !== Number(mediaId)) return true
+            if (!mediaType || !r.mediaType) return false
+            return r.mediaType !== mediaType
+          }),
           ...data.reviews,
         ]
       }
@@ -203,10 +218,12 @@ export const useMediaStore = defineStore('media', () => {
     }
   }
 
-  function getReviewsByMediaId(mediaId) {
-    return reviews.value.filter(
-      r => Number(r.mediaId) === Number(mediaId)
-    )
+  function getReviewsByMediaId(mediaId, mediaType = null) {
+    return reviews.value.filter(r => {
+      if (Number(r.mediaId) !== Number(mediaId)) return false
+      if (mediaType && r.mediaType && r.mediaType !== mediaType) return false
+      return true
+    })
   }
 
   async function addReview(reviewData) {
@@ -217,7 +234,12 @@ export const useMediaStore = defineStore('media', () => {
           'Content-Type': 'application/json',
           ...authHeaders(),
         },
-        body: JSON.stringify(reviewData),
+        body: JSON.stringify({
+          mediaId: reviewData.mediaId,
+          mediaType: reviewData.mediaType || 'movie',
+          rating: reviewData.rating,
+          content: reviewData.content,
+        }),
       })
 
       const data = await res.json()
@@ -230,6 +252,7 @@ export const useMediaStore = defineStore('media', () => {
 
       const movie = movies.value.find(
         m => m.id === Number(reviewData.mediaId)
+          && m.type === (reviewData.mediaType || 'movie')
       )
 
       if (movie) {
@@ -298,14 +321,11 @@ export const useMediaStore = defineStore('media', () => {
     }
   }
 
-  //  WATCHLIST — always use { mediaId, type }; ids are not unique across movie/tv.
-
-  function isInWatchlist(mediaId, mediaType = null) {
-    return watchlist.value.some(item => {
-      if (Number(item.mediaId) !== Number(mediaId)) return false
-      if (mediaType && item.type !== mediaType) return false
-      return true
-    })
+  // One watchlist slot per TMDB id; type says whether to call /movie or /tv API.
+  function isInWatchlist(mediaId) {
+    return watchlist.value.some(
+      item => Number(item.mediaId) === Number(mediaId)
+    )
   }
 
   async function fetchWatchlist(userId) {
@@ -342,15 +362,16 @@ export const useMediaStore = defineStore('media', () => {
       const data = await res.json()
 
       if (data.saved) {
-        if (!isInWatchlist(mediaId, mediaType)) {
-          watchlist.value.push({
-            mediaId: Number(mediaId),
-            type: mediaType
-          })
-        }
+        watchlist.value = watchlist.value.filter(
+          item => Number(item.mediaId) !== Number(mediaId)
+        )
+        watchlist.value.push({
+          mediaId: Number(mediaId),
+          type: mediaType,
+        })
       } else {
         watchlist.value = watchlist.value.filter(
-          item => !(Number(item.mediaId) === Number(mediaId) && item.type === mediaType)
+          item => Number(item.mediaId) !== Number(mediaId)
         )
       }
 
@@ -408,6 +429,7 @@ export const useMediaStore = defineStore('media', () => {
     search,
     loadDetail,
     loadReviewStatsForMovies,
+    resolveDetail,
 
     getMovieById,
 

@@ -30,19 +30,20 @@
           <span class="text-light ms-2">{{ featured.reviewCount }} reviews</span>
         </div>
         <div class="d-flex gap-2 flex-wrap">
+          <!-- Binh: pass ?type= — same TMDB id can be movie or tv (e.g. 76479). -->
           <RouterLink
             :to="{ name: 'MediaDetail', params: { id: featured.id }, query: { type: featured.type } }"
             class="btn btn-primary"
           >
             View Details
           </RouterLink>
-          <!-- Include type in watchlist check — TMDB ids overlap between movie and tv. -->
+          <!-- Binh: pass featured.type to watchlist — ids overlap between movie and tv. -->
           <button
             v-if="auth.isAuthenticated"
             class="btn btn-outline-light"
             @click="mediaStore.toggleWatchlist(featured.id, featured.type)"
           >
-            {{ mediaStore.isInWatchlist(featured.id, featured.type) ? '✓ In Watchlist' : '+ Watchlist' }}
+            {{ mediaStore.isInWatchlist(featured.id) ? '✓ In Watchlist' : '+ Watchlist' }}
           </button>
         </div>
       </div>
@@ -116,19 +117,20 @@
             <div class="bg-dark rounded p-3 h-100">
               <ReviewCard :review="review" />
               <div class="d-flex align-items-center mt-2 gap-2">
+                <!-- Binh: link + poster use mediaType so review opens the correct title. -->
                 <RouterLink
-                  :to="{ name: 'MediaDetail', params: { id: review.mediaId }, query: { type: getMedia(review.mediaId)?.type || 'movie' } }"
+                  :to="{ name: 'MediaDetail', params: { id: review.mediaId }, query: { type: review.mediaType || getMedia(review.mediaId, review.mediaType)?.type || 'movie' } }"
                   class="text-decoration-none text-light d-flex flex-column align-items-center"
                   style="width: 80px;"
                 >
                   <img
-                    :src="getMedia(review.mediaId)?.poster"
-                    :alt="getMedia(review.mediaId)?.title"
+                    :src="getMedia(review.mediaId, review.mediaType)?.poster"
+                    :alt="getMedia(review.mediaId, review.mediaType)?.title"
                     class="img-fluid rounded"
                     style="height: 120px; object-fit: cover;"
                   />
                   <small class="text-muted text-center mt-1">
-                    {{ getMedia(review.mediaId)?.title }}
+                    {{ getMedia(review.mediaId, review.mediaType)?.title }}
                   </small>
                 </RouterLink>
               </div>
@@ -163,9 +165,10 @@ const featured = computed(() => mediaStore.movies[0])
 // Recent reviews still come from your own backend
 const recentReviews = computed(() => [...mediaStore.reviews].slice(0, 4))
 
-// Used by the reviews section to get the poster/title of the reviewed movie
-function getMedia(id) {
-  return mediaStore.getMovieById(id)
+// Binh: lookup by id + type; fallback to other type if cache only has the sibling entry.
+function getMedia(id, type = 'movie') {
+  return mediaStore.getMovieById(id, type)
+    || mediaStore.getMovieById(id, type === 'tv' ? 'movie' : 'tv')
 }
 </script>
 

@@ -71,7 +71,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useMediaStore } from '../stores/media'
 import { useAuthStore } from '../stores/auth'
@@ -92,28 +92,29 @@ const filteredMedia = computed(() =>
   mediaStore.movies.filter(m => m.title.toLowerCase().includes(mediaSearch.value.toLowerCase())).slice(0, 6)
 )
 
-// Pre-select media when coming from a media page (/review/new/:mediaId)
-if (route.params.mediaId) {
-  const mediaType = route.query.type || 'movie'
-  const preselected = mediaStore.getMovieById(Number(route.params.mediaId), mediaType)
-  if (preselected) {
-    selectedMedia.value = preselected
-  } else {
-    mediaStore.loadDetail(Number(route.params.mediaId), mediaType).then(detail => {
-      if (detail) selectedMedia.value = detail
-    })
-  }
+// Binh: load correct title via ?type= (TMDB reuses numeric ids for movie and tv).
+async function resolveMedia(id, preferredType = 'movie') {
+  return mediaStore.resolveDetail(id, preferredType)
 }
 
-// Prefill if editing
-if (isEditing.value) {
-  const existing = mediaStore.reviews.find(r => r.id === Number(route.params.reviewId))
-  if (existing) {
-    selectedMedia.value = mediaStore.getMovieById(existing.mediaId)
+onMounted(async () => {
+  if (route.params.mediaId) {
+    // Binh: honor ?type= from Media Detail links.
+    const mediaType = route.query.type || 'movie'
+    selectedMedia.value = await resolveMedia(Number(route.params.mediaId), mediaType)
+    return
+  }
+
+  if (isEditing.value) {
+    const existing = mediaStore.reviews.find(r => r.id === Number(route.params.reviewId))
+    if (!existing) return
     form.rating = existing.rating
     form.body = existing.content ?? ''
+    // Binh: edit flow — type from query or defaults to movie.
+    const mediaType = route.query.type || 'movie'
+    selectedMedia.value = await resolveMedia(existing.mediaId, mediaType)
   }
-}
+})
 
 function validate() {
   errors.rating = form.rating === 0 ? 'Please give a rating.' : ''
@@ -125,6 +126,8 @@ async function submitReview() {
   if (!validate()) return
   const payload = {
     mediaId: selectedMedia.value.id,
+    // Binh: store mediaType on review so backend can tell movie vs tv apart.
+    mediaType: selectedMedia.value.type || 'movie',
     rating: parseInt(form.rating),
     content: form.body,
   }

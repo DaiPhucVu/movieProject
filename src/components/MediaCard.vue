@@ -39,8 +39,8 @@ const props = defineProps({
 
 const mediaStore = useMediaStore()
 const auth = useAuthStore()
-// Id + type — shared TMDB ids between movie and tv.
-const inWatchlist = computed(() => mediaStore.isInWatchlist(props.media.id, props.media.type))
+// Id-only match — one watchlist slot per TMDB id.
+const inWatchlist = computed(() => mediaStore.isInWatchlist(props.media.id))
 
 function toggleWatchlist() {
   if (!auth.isAuthenticated) return

@@ -19,20 +19,22 @@
             <!-- Action buttons -->
             <div class="d-flex flex-column gap-2 mt-3">
               <template v-if="auth.isAuthenticated">
+                <!-- Binh: watchlist needs media.type — TMDB ids are not unique across movie/tv. -->
                 <button
                   class="cl-btn cl-btn-primary w-100"
                   @click="mediaStore.toggleWatchlist(media.id, media.type)"
                 >
                   {{ inWatchlist ? '✓ In Watchlist' : '+ Add to Watchlist' }}
                 </button>
+                <!-- Binh: carry ?type= to Write Review so the right show/film loads. -->
                 <RouterLink
                   v-if="!hasUserReviewed"
-                  :to="`/review/new/${media.id}`"
+                  :to="{ path: `/review/new/${media.id}`, query: { type: media.type || 'movie' } }"
                   class="cl-btn cl-btn-ghost w-100"
                 >✍ Write a Review</RouterLink>
                 <RouterLink
                   v-else
-                  :to="`/review/edit/${userReview.id}`"
+                  :to="{ path: `/review/edit/${userReview.id}`, query: { type: media.type || 'movie' } }"
                   class="cl-btn cl-btn-ghost w-100"
                 >✍ Edit Your Review</RouterLink>
               </template>
@@ -123,9 +125,10 @@
         <div v-else-if="reviews.length === 0" class="empty-state cl-card p-5 text-center">
           <h3 class="cl-display h4 mb-2">No reviews yet</h3>
           <p class="cl-muted mb-4">Be the first to share your thoughts on {{ media.title }}.</p>
+          <!-- Binh: same ?type= on review + login redirect links (see hero buttons). -->
           <RouterLink
             v-if="auth.isAuthenticated"
-            :to="`/review/new/${media.id}`"
+            :to="{ path: `/review/new/${media.id}`, query: { type: media.type || 'movie' } }"
             class="cl-btn cl-btn-primary"
           >Write the first review</RouterLink>
           <RouterLink
@@ -191,20 +194,21 @@ const loadingMedia = ref(true)
 
 // The route param is the TMDB id; the query param tells us movie vs tv.
 const mediaId = computed(() => Number(route.params.id))
+// Binh: read movie vs tv from URL — required when ids collide on TMDB.
 const mediaType = computed(() => route.query.type || 'movie')
 
 // getMovieById checks detailCache first (populated by loadDetail), then movies.
 // After loadMedia() runs, the title is in the cache.
 const media = computed(() => mediaStore.getMovieById(mediaId.value, mediaType.value))
 
-// Watchlist match needs id + type (TMDB ids overlap for movie vs tv).
 const inWatchlist = computed(() =>
-  media.value ? mediaStore.isInWatchlist(media.value.id, media.value.type) : false
+  media.value ? mediaStore.isInWatchlist(media.value.id) : false
 )
 
+// Binh: filter reviews by mediaType so movie/tv with same id stay separate.
 const reviews = computed(() => {
   if (!media.value) return []
-  return mediaStore.getReviewsByMediaId(media.value.id)
+  return mediaStore.getReviewsByMediaId(media.value.id, media.value.type)
 })
 
 const userReview = computed(() => {
@@ -290,7 +294,7 @@ async function loadMedia() {
 async function loadReviews() {
   loadingReviews.value = true
   try {
-    await mediaStore.fetchReviewsByMediaId(mediaId.value)
+    await mediaStore.fetchReviewsByMediaId(mediaId.value, mediaType.value)
   } catch (err) {
     console.error('Could not load reviews:', err)
   } finally {
