@@ -19,10 +19,7 @@
         <span>♥</span> {{ review.likes }}
       </button>
       <div v-if="canEdit" class="review-actions">
-        <RouterLink
-          :to="{ path: `/review/edit/${review.id}`, query: { type: review.mediaType || 'movie' } }"
-          class="action-btn edit-btn"
-        >Edit</RouterLink>
+        <RouterLink :to="`/review/edit/${review.id}`" class="action-btn edit-btn">Edit</RouterLink>
         <button class="action-btn delete-btn" @click="$emit('delete', review.id)">Delete</button>
       </div>
     </div>
@@ -36,15 +33,14 @@ import { useMediaStore } from '../stores/media'
 import { avatarUrl } from '../utils/avatar'
 
 const props = defineProps({ review: { type: Object, required: true } })
-defineEmits(['delete'])
+const emit = defineEmits(['delete', 'like'])
 
 const auth = useAuthStore()
-const mediaStore = useMediaStore()
 const canEdit = computed(() => auth.isAuthenticated && auth.user?.id === props.review.userId)
 
 function handleLike() {
   if (!auth.isAuthenticated) return
-  mediaStore.toggleReviewLike(props.review.id, auth.user.id)
+  emit('like', props.review.id)
 }
 
 function formatDate(d) {
