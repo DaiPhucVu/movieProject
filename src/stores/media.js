@@ -288,7 +288,7 @@ export const useMediaStore = defineStore('media', () => {
           'Content-Type': 'application/json',
           ...authHeaders()
         },
-        body: JSON.stringify({ mediaId })
+        body: JSON.stringify({ mediaId, type: mediaType })
       })
 
       const data = await res.json()

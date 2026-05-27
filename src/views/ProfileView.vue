@@ -119,7 +119,7 @@
               <span class="cl-dim stat-label">Reviews</span>
             </button>
             <button class="stat-item" type="button" @click="activeTab = 'watchlist'">
-              <span class="cl-display stat-val cl-accent">{{ profile.stats.watchlist }}</span>
+              <span class="cl-display stat-val cl-accent">{{ watchlistCount }}</span>
               <span class="cl-dim stat-label">Watchlist</span>
             </button>
             <RouterLink
@@ -170,7 +170,7 @@
             @click="activeTab = 'watchlist'"
           >
             Watchlist
-            <span class="filter-count">{{ profile.stats.watchlist }}</span>
+            <span class="filter-count">{{ watchlistCount }}</span>
           </button>
         </div>
 
@@ -437,6 +437,8 @@ const watchlistMedia = computed(() =>
     .map(item => mediaStore.getMovieById(item.mediaId, item.type))
     .filter(Boolean)
 )
+
+const watchlistCount = computed(() => watchlistMedia.value.length)
 
 // Used by reviews tab to show the poster of each reviewed title.
 function getMedia(mediaId, type = 'movie') {
