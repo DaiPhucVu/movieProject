@@ -68,6 +68,11 @@
               <span class="cl-muted small">
                 {{ reviews.length }} {{ reviews.length === 1 ? 'review' : 'reviews' }}
               </span>
+              <span v-if="apiRating || reviewAverage" class="cl-dim small">&nbsp;·&nbsp;
+                <template v-if="apiRating">TMDB: {{ apiRating }}</template>
+                <template v-if="apiRating && reviewAverage">&nbsp;·&nbsp;</template>
+                <template v-if="reviewAverage">Reviews: {{ reviewAverage }}</template>
+              </span>
               <span v-if="media.likes" class="cl-muted small">❤ {{ formatNum(media.likes) }}</span>
             </div>
 
@@ -208,11 +213,25 @@ const userReview = computed(() => {
 })
 const hasUserReviewed = computed(() => userReview.value !== null)
 
-// Show the local average if we have reviews, otherwise fall back to TMDB's rating.
-const displayRating = computed(() => {
-  if (reviews.value.length === 0) return media.value?.rating?.toFixed(1) ?? '–'
+const apiRating = computed(() => media.value?.rating ? Number(media.value.rating).toFixed(1) : null)
+const reviewAverage = computed(() => {
+  if (reviews.value.length === 0) return null
   const sum = reviews.value.reduce((acc, r) => acc + r.rating, 0)
   return (sum / reviews.value.length).toFixed(1)
+})
+
+// Compute a combined rating (70% TMDB API, 30% user reviews) when both exist.
+const displayRating = computed(() => {
+  const tmdb = Number(media.value?.rating ?? 0)
+  const reviewCount = reviews.value.length
+  const reviewAvg = reviewCount === 0 ? 0 : reviews.value.reduce((acc, r) => acc + r.rating, 0) / reviewCount
+
+  if (reviewCount === 0) {
+    return media.value?.rating ? media.value.rating.toFixed(1) : '–'
+  }
+
+  const combined = tmdb ? (tmdb * 0.7 + reviewAvg * 0.3) : reviewAvg
+  return combined.toFixed(1)
 })
 
 const sortedReviews = computed(() => {

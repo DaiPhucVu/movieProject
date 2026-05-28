@@ -11,14 +11,28 @@ This backend is a simple Express + Prisma service for the CineLOG app.
    npm install
    ```
 
-2. Generate Prisma client and run migration:
+2. Create the backend environment file:
+
+   ```bash
+   cd backend
+   cp .env.example .env
+   ```
+
+3. Generate Prisma client and apply migrations:
 
    ```bash
    npx prisma generate
    npx prisma migrate dev --name init
+   npx prisma db seed
    ```
 
-3. Start the server:
+   Or use the helper script:
+
+   ```bash
+   npm run setup
+   ```
+
+4. Start the server:
 
    ```bash
    npm run dev

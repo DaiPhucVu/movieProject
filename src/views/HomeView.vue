@@ -25,7 +25,7 @@
         <p class="lead text-light" style="max-width: 600px;">{{ featured.synopsis }}</p>
         <div class="d-flex align-items-center gap-2 mb-3">
           <span class="text-warning fs-5">★</span>
-          <span class="fw-semibold">{{ featured.rating }}</span>
+          <span class="fw-semibold">{{ Number(featured.combinedRating ?? featured.rating).toFixed(1) }}</span>
           <span class="text-light">/10</span>
           <span class="text-light ms-2">{{ featured.reviewCount }} reviews</span>
         </div>

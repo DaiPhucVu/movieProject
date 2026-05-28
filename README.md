@@ -7,11 +7,25 @@ Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://
 
 # How the backend work
 ### Note: 
-Backend is done, to run both backend and the app at once pls do this in cd movieProject
+Backend is done. To run both backend and the app at once from the root folder:
 ```bash
+npm install
+cd backend
+npm install
+cd ..
 npm run dev:all
 ```
-otherwise u will have to run them one by one
+If you already installed dependencies and configured the backend environment, you can just run `npm run dev:all` from the root.
+
+If you need to set up the backend first:
+```bash
+cd backend
+cp .env.example .env
+npx prisma generate
+npx prisma migrate dev --name init
+npx prisma db seed
+```
+Otherwise you will have to run the frontend and backend one by one.
 
 Located in folder named backend
 

@@ -4,7 +4,8 @@
       <img :src="media.poster" :alt="media.title" loading="lazy" />
       <div class="card-overlay">
         <div class="card-rating">
-          <span class="star-icon">★</span> {{ media.rating }}
+          <span class="star-icon">★</span>
+          {{ Number(media.combinedRating ?? media.rating ?? 0).toFixed(1) }}
         </div>
         <span class="badge badge-type">{{ media.type === 'tv' ? 'TV' : 'Film' }}</span>
       </div>
