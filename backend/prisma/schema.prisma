@@ -25,6 +25,7 @@ model User {
 
   sentFollowRequests     FollowRequest[] @relation("SentFollowRequests")
   receivedFollowRequests FollowRequest[] @relation("ReceivedFollowRequests")
+  reviewLikes            ReviewLike[]
 }
 
 // Directed follow edge: followerId -> followingId
@@ -84,6 +85,7 @@ model Review {
   userId    Int
   mediaId   Int
   mediaType String   @default("movie")
+  likes     ReviewLike[]
 }
 
 model Watchlist {
@@ -93,4 +95,14 @@ model Watchlist {
   type    String @default("movie")
 
   @@unique([userId, mediaId])
+}
+model ReviewLike {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  reviewId  Int
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  review    Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, reviewId])
 }

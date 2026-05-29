@@ -541,7 +541,11 @@ async function loadReviews() {
       reviews.value = []
       return
     }
-    reviews.value = data.reviews || []
+    reviews.value = (data.reviews || []).map(r => ({
+      ...r,
+      likes: r.likeCount ?? r.likes ?? 0,
+      liked: r.liked ?? false,
+    }))
 
     // Hydrate TMDB detail for each reviewed title so we can show its poster.
     // Errors are caught per-item so one bad fetch doesn't kill the list.

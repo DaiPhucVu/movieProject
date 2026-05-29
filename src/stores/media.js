@@ -181,13 +181,21 @@ export const useMediaStore = defineStore('media', () => {
   //  REVIEWS 
   async function fetchReviewsByMediaId(mediaId) {
     try {
-      const res = await fetch(`${API}/reviews?mediaId=${mediaId}`)
+      const res = await fetch(`${API}/reviews?mediaId=${mediaId}`, {
+        headers: { ...authHeaders() },
+      })
       const data = await res.json()
 
       if (res.ok) {
+        // Normalise: backend now returns likeCount/liked instead of likes array
+        const shaped = data.reviews.map(r => ({
+          ...r,
+          likes: r.likeCount ?? r.likes ?? 0,
+          liked: r.liked ?? false,
+        }))
         reviews.value = [
           ...reviews.value.filter(r => r.mediaId !== Number(mediaId)),
-          ...data.reviews,
+          ...shaped,
         ]
       }
     } catch (err) {
@@ -435,19 +443,42 @@ export const useMediaStore = defineStore('media', () => {
     )
   }
 
-  function toggleReviewLike(reviewId, userId) {
+  async function toggleReviewLike(reviewId) {
+    // Optimistic update first so UI feels instant
     const review = reviews.value.find(r => r.id === Number(reviewId))
-    if (!review) return
-    if (!review._likedBy) review._likedBy = []
-    const alreadyLiked = review._likedBy.includes(userId)
-    if (alreadyLiked) {
-      review._likedBy = review._likedBy.filter(id => id !== userId)
-      review.likes = Math.max(0, (review.likes || 0) - 1)
-      review.liked = false
-    } else {
-      review._likedBy.push(userId)
-      review.likes = (review.likes || 0) + 1
-      review.liked = true
+    if (review) {
+      review.liked = !review.liked
+      review.likes = review.liked
+        ? (review.likes || 0) + 1
+        : Math.max(0, (review.likes || 0) - 1)
+    }
+    // Persist to backend
+    try {
+      const res = await fetch(`${API}/reviews/${reviewId}/like`, {
+        method: 'POST',
+        headers: { ...authHeaders() },
+      })
+      const data = await res.json()
+      if (res.ok && review) {
+        // Sync with server truth
+        review.liked = data.liked
+        review.likes = data.likeCount
+      } else if (!res.ok && review) {
+        // Roll back optimistic update
+        review.liked = !review.liked
+        review.likes = review.liked
+          ? (review.likes || 0) + 1
+          : Math.max(0, (review.likes || 0) - 1)
+      }
+    } catch (err) {
+      console.error('toggleReviewLike error:', err)
+      // Roll back on network error
+      if (review) {
+        review.liked = !review.liked
+        review.likes = review.liked
+          ? (review.likes || 0) + 1
+          : Math.max(0, (review.likes || 0) - 1)
+      }
     }
   }
 

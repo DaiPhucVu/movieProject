@@ -51,7 +51,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useMediaStore } from '../stores/media'
 import MediaCard from '../components/MediaCard.vue'
 
@@ -60,6 +60,23 @@ const mediaStore = useMediaStore()
 const query = ref('')
 const filters = reactive({ type: '', genre: '', sort: 'relevance', year: '' })
 const genres = ['Action', 'Drama', 'Comedy', 'Sci-Fi', 'Horror', 'Thriller', 'Romance', 'Animation']
+
+// Load trending on mount if store is empty (e.g. hard refresh on /search)
+onMounted(async () => {
+  if (mediaStore.movies.length === 0) {
+    await mediaStore.loadTrending()
+  }
+})
+
+// When user types, call TMDB search for real results
+let searchTimer = null
+watch(query, (val) => {
+  clearTimeout(searchTimer)
+  if (!val.trim()) return
+  searchTimer = setTimeout(() => {
+    mediaStore.search(val.trim(), filters)
+  }, 400)
+})
 
 const results = computed(() => {
   let list = [...mediaStore.movies]

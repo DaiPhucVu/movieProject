@@ -316,7 +316,7 @@ watch([mediaId, mediaType], async () => {
 // directly here. Same pattern as toggleWatchlist or addReview internally.
 function handleLike(reviewId) {
   if (!auth.isAuthenticated) return
-  mediaStore.toggleReviewLike(reviewId, auth.user.id)
+  mediaStore.toggleReviewLike(reviewId)
 }
 
 async function handleDelete(reviewId) {

@@ -181,7 +181,7 @@ app.post('/api/auth/login', async (req, res) => {
 })
 
 // ── Reviews ────────────────────────────────────────────────────────
-app.get('/api/reviews', async (req, res) => {
+app.get('/api/reviews', attachUser, async (req, res) => {
   try {
     const mediaId = req.query.mediaId ? Number(req.query.mediaId) : undefined
     const mediaType = req.query.mediaType ? String(req.query.mediaType) : undefined
@@ -190,13 +190,46 @@ app.get('/api/reviews', async (req, res) => {
     if (mediaType) where.mediaType = mediaType
     const reviews = await prisma.review.findMany({
       where,
-      include: { user: true },
+      include: {
+        user: true,
+        likes: { select: { userId: true } },
+      },
       orderBy: { createdAt: 'desc' },
     })
-    res.json({ reviews })
+    // Attach likeCount and liked (whether current user liked it)
+    const shaped = reviews.map(r => ({
+      ...r,
+      likeCount: r.likes.length,
+      liked: req.userId ? r.likes.some(l => l.userId === req.userId) : false,
+      likes: undefined,
+    }))
+    res.json({ reviews: shaped })
   } catch (err) {
     console.error('GET /api/reviews error:', err)
     res.status(500).json({ error: 'Could not fetch reviews' })
+  }
+})
+
+app.get('/api/reviews/:id', attachUser, async (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    const review = await prisma.review.findUnique({
+      where: { id },
+      include: {
+        user: true,
+        likes: { select: { userId: true } },
+      },
+    })
+    if (!review) return res.status(404).json({ error: 'Review not found' })
+    res.json({
+      ...review,
+      likeCount: review.likes.length,
+      liked: req.userId ? review.likes.some(l => l.userId === req.userId) : false,
+      likes: undefined,
+    })
+  } catch (err) {
+    console.error('GET /api/reviews/:id error:', err)
+    res.status(500).json({ error: 'Could not fetch review' })
   }
 })
 
@@ -283,6 +316,28 @@ app.get('/api/reviews/stats/:mediaId', async (req, res) => {
   } catch (err) {
     console.error('GET /api/reviews/stats error:', err)
     res.status(500).json({ error: 'Could not fetch review stats' })
+  }
+})
+
+
+// ── Review Likes ───────────────────────────────────────────────────
+app.post('/api/reviews/:id/like', authenticate, async (req, res) => {
+  try {
+    const reviewId = Number(req.params.id)
+    const existing = await prisma.reviewLike.findUnique({
+      where: { userId_reviewId: { userId: req.userId, reviewId } },
+    })
+    if (existing) {
+      await prisma.reviewLike.delete({ where: { id: existing.id } })
+      const count = await prisma.reviewLike.count({ where: { reviewId } })
+      return res.json({ liked: false, likeCount: count })
+    }
+    await prisma.reviewLike.create({ data: { userId: req.userId, reviewId } })
+    const count = await prisma.reviewLike.count({ where: { reviewId } })
+    res.json({ liked: true, likeCount: count })
+  } catch (err) {
+    console.error('POST /api/reviews/:id/like error:', err)
+    res.status(500).json({ error: 'Could not toggle like' })
   }
 })
 
@@ -460,10 +515,19 @@ app.get('/api/users/:username/reviews', attachUser, async (req, res) => {
     }
     const reviews = await prisma.review.findMany({
       where:   { userId: user.id },
-      include: { user: true },
+      include: {
+        user: true,
+        likes: { select: { userId: true } },
+      },
       orderBy: { createdAt: 'desc' },
     })
-    res.json({ reviews })
+    const shaped = reviews.map(r => ({
+      ...r,
+      likeCount: r.likes.length,
+      liked: req.userId ? r.likes.some(l => l.userId === req.userId) : false,
+      likes: undefined,
+    }))
+    res.json({ reviews: shaped })
   } catch (err) {
     console.error('GET /api/users/:username/reviews error:', err)
     res.status(500).json({ error: 'Could not fetch reviews' })

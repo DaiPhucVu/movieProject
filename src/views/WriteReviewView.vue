@@ -106,7 +106,16 @@ onMounted(async () => {
   }
 
   if (isEditing.value) {
-    const existing = mediaStore.reviews.find(r => r.id === Number(route.params.reviewId))
+    let existing = mediaStore.reviews.find(r => r.id === Number(route.params.reviewId))
+    if (!existing) {
+      // Not in store (e.g. navigated from profile page) — fetch directly
+      try {
+        const res = await fetch(`http://localhost:3000/api/reviews/${route.params.reviewId}`, {
+          headers: auth.token ? { Authorization: `Bearer ${auth.token}` } : {},
+        })
+        if (res.ok) existing = await res.json()
+      } catch (e) { /* ignore */ }
+    }
     if (!existing) return
     form.rating = existing.rating
     form.body = existing.content ?? ''
