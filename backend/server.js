@@ -14,7 +14,7 @@ const jwtSecret = process.env.JWT_SECRET || 'secret'
 app.use(cors({
   origin: [
     'http://localhost:5173',           // local dev (Vite default)
-    'https://mercury.swin.edu.au/cos30043/s104355076/movieProject/',    // Mercury frontend URL
+    'https://mercury.swin.edu.au',    // Mercury frontend URL
   ]
 }))
 app.use(express.json({ limit: '2mb' }))
